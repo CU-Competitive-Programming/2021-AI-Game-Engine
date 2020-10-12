@@ -1,29 +1,15 @@
 from dataclasses import dataclass, field
-from typing import *
+from typing import List, Callable, Optional
 
 import numpy as np
 
-
-@dataclass(init=True, repr=True)
-class Game:
-    units: list['Unit'] = field(default_factory=list)
-    groups: list['Group'] = field(default_factory=list)
-
-    def create_unit(self, *args):
-        unit = Unit(self, len(self.units), *args)
-        self.units.append(unit)
-        return unit
-
-    def create_group(self, *args):
-        group = Group(self, len(self.groups), *args)
-        self.groups.append(group)
-        return group
+from engine import game
 
 
 @dataclass(init=True, repr=True, eq=True)
 class Unit:  # use dataclass?
     """A base class for all units on the field"""
-    game: Game
+    game: 'game.Game'
     id: int
     owner: int  # owner_id
     speed: int
@@ -35,9 +21,10 @@ class Unit:  # use dataclass?
     position: np.ndarray  # size 2, alternatively 2-tuple
 
     queued_moves: List[np.ndarray] = field(default_factory=list)
-    _group: 'Group' = field(default=None)
+    _group: 'Group' = field(default=None)  # This should only be modified from the relevant group object
 
     def move(self, npos) -> None:
+        """Move the unit to a new location. If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
         assert len(npos) == 2, "New position must be length 2!"
         if self._group is not None:
             self._group.remove_member(self)
@@ -52,17 +39,23 @@ class Unit:  # use dataclass?
         self.position = (self.position + diff).astype(int)
 
     def process_turn(self) -> None:
+        """If the unit has queued moves, perform the first queued move."""
         if self.queued_moves:
             self.move(self.queued_moves.pop())
 
-    def units_within(self, dist):
+    def units_within(self, dist: float, check: Optional[Callable[['Unit'], bool]] = None) -> List['Unit']:
+        """Get a list of all units within the given distance of the unit.
+        Optionally pass a check function and only return units which pass the check."""
         for unit in self.game.units:
-            if unit != self:
+            if unit != self and check(unit) if check else True:
                 if np.hypot(*(unit.position - self.position)) <= dist:
                     yield unit
 
+    def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
+        """Get a list of all groups within the given distance of the unit.
+        Optionally pass a check function and only return groups which pass the check."""
         for group in self.game.groups:
-            if group != self:
+            if group != self and check(group) if check else True:
                 if np.hypot(*(group.position - self.position)) <= dist:
                     yield group
 
@@ -70,8 +63,9 @@ class Unit:  # use dataclass?
 @dataclass(init=True, repr=True, eq=True)
 class Group:
     """A group of units"""
-    game: Game
+    game: 'game.Game'
     id: int
+    owner: int
     position: np.ndarray  # size 2 - alternatively 2-tuple
 
     queued_moves: List[np.ndarray] = field(default_factory=list)
@@ -94,7 +88,9 @@ class Group:
     def speed(self):
         return min(self.members, key=lambda unit: unit.speed).speed
 
-    def move(self, npos):
+    def move(self, npos) -> None:
+        """Moves the group and all units in it to the specified location.
+         If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
         assert len(npos) == 2, "New position must be length 2!"
 
         npos = np.array(npos)
@@ -108,27 +104,35 @@ class Group:
             unit.move((npos + diff).astype(int))
 
     def process_turn(self) -> None:
+        """If the unit has queued moves, perform the first queued move."""
         if self.queued_moves:
             self.move(self.queued_moves.pop())
 
     def add_member(self, unit: Unit) -> None:
+        """Add a member to the group"""
         assert np.hypot(*(unit.position - self.position)) < unit.speed, "Group too far away!"
+        assert unit.owner == self.owner, "The unit must belong to the same player as the group!"
         unit.position = self.position
         self.members.append(unit)
         unit._group = self
 
     def remove_member(self, unit: Unit) -> None:
+        """Remove a member from this group."""
         self.members.remove(unit)
         unit._group = None
 
-    def units_within(self, dist):
+    def units_within(self, dist: float, check: Optional[Callable[[Unit], bool]] = None) -> List[Unit]:
+        """Get a list of all units within the given distance of the group.
+        Optionally pass a check function and only return units which pass the check."""
         for unit in self.game.units:
-            if unit != self:
+            if unit != self and check(unit) if check else True:
                 if np.hypot(*(unit.position - self.position)) <= dist:
                     yield unit
 
-    def groups_within(self, dist):
+    def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
+        """Get a list of all groups within the given distance of the group.
+        Optionally pass a check function and only return groups which pass the check."""
         for group in self.game.groups:
-            if group != self:
+            if group != self and check(group) if check else True:
                 if np.hypot(*(group.position - self.position)) <= dist:
                     yield group

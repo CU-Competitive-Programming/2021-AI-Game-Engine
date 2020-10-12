@@ -1,6 +1,6 @@
 import numpy as np
 
-from engine.unit import Game
+from engine import Game
 
 game = Game()
 
