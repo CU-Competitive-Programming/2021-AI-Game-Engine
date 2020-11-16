@@ -5,21 +5,23 @@ import numpy as np
 
 # from scipy.misc import toimage
 
-chunksize = 8
+debug = False
 
-shape = (512, 512)
-scale = 100.0
-octaves = 2
-persistence = .8
-lacunarity = 5
+chunksize = 1
 
-# shape = 1024, 1024
+# shape = (64, 64)
 # scale = 100.0
-# octaves = 6
-# persistence = 0.5
-# lacunarity = 2.0
+# octaves = 2
+# persistence = .8
+# lacunarity = 5
 
-d = 1 # random.randint(0, 100)
+shape = 1024, 1024
+scale = 100.0
+octaves = 12
+persistence = 0.5
+lacunarity = 2.0
+
+d = random.randint(0, 100)
 world = np.zeros(shape)
 for i in range(shape[0]):
     for j in range(shape[1]):
@@ -63,27 +65,28 @@ print(world.max(), world.min())
 
 
 def norm(x):
-    # if x < -0.05:
-    #     return 0
+    if x < -0.05:
+        return 1
     # elif x < 0:
     #     return 1
-    # elif x < 1.0:
-    #     return 2
-
-    if -.2 < x < 0.2:
+    elif x < 1.0:
         return 0
-    if -.2 <= x <= -.3:
-        return 2
-    if .2 >= x >= .3:
-        return 3
 
-    return 1
+    # if -.2 < x < 0.2:
+    #     return 0
+    # if -.2 <= x <= -.3:
+    #     return 2
+    # if .2 >= x >= .3:
+    #     return 3
+    #
+    # return 1
 
 
 vf = np.vectorize(norm)
 adjworld = vf(world)
 adjchunk = vf(chunks)
 print(adjchunk)
+
 
 import pygame
 import pygame.locals
@@ -103,25 +106,25 @@ def load_tile_table(filename, width, height):
 
 
 pygame.init()
-screen = pygame.display.set_mode((adjchunk.shape[0] * 16, adjchunk.shape[1] * 16))
-# screen = pygame.display.set_mode((adjchunk.shape[0], adjchunk.shape[1]))
+# screen = pygame.display.set_mode((adjchunk.shape[0] * 16, adjchunk.shape[1] * 16))
+screen = pygame.display.set_mode((adjchunk.shape[0], adjchunk.shape[1]))
 screen.fill((255, 255, 255))
-table = np.array(load_tile_table("assets/sheet.png", 16, 16))
-# table = np.array(load_tile_table("assets/sheet.png", 1, 1))
+# table = np.array(load_tile_table("assets/sheet.png", 16, 16))
+table = np.array(load_tile_table("assets/sheet.png", 1, 1))
 
-# grass = table[0:3, 0]
-# rock = table[5 * 16: 6 * 16, 16 + 4]
-# metal = table[6:8, 7 * 16 + 3]
-# wood = table[2 * 16 + 4:2 * 16 + 8, 16 + 4]
 grass = table[0:3, 0]
-rock = table[3:6, 1]
-metal = table[6:7, 29]
-wood = table[4:7, 0]
+rock = table[0 * 16: 1 * 16, 24 * 16 + 4] #table[5 * 16: 6 * 16, 16 + 4]  # water
+metal = table[6:8, 7 * 16 + 3]
+wood = table[2 * 16 + 4:2 * 16 + 8, 16 + 4]
+# grass = table[0:3, 0]
+# rock = table[3:6, 1]
+# metal = table[6:7, 29]
+# wood = table[4:7, 0]
 
 for x, row in enumerate(adjchunk):
     for y, tile in enumerate(row):
-        pos = (x * 16, y * 16)
-        # pos = x, y
+        # pos = (x * 16, y * 16)
+        pos = x, y
         if tile == 0:
             screen.blit(random.choice(grass), pos)
         elif tile == 1:
