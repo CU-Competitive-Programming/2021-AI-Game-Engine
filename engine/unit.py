@@ -59,6 +59,29 @@ class Unit:  # use dataclass?
                 if np.hypot(*(group.position - self.position)) <= dist:
                     yield group
 
+    def attack(self):
+        pass
+
+
+class Gatherer(Unit):
+    pass
+
+
+class WeakRanger(Unit):
+    pass
+
+
+class StrongRanger(Unit):
+    pass
+
+
+class WeakMelee(Unit):
+    pass
+
+
+class StrongMelee(Unit):
+    pass
+
 
 @dataclass(init=True, repr=True, eq=True)
 class Group:
