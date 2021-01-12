@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 from typing import Dict
 
@@ -8,6 +9,7 @@ from .player import Player
 from . import units
 from .round import GameRound
 import sys
+
 
 class AIGame(object):
     _units: Dict[int, 'units.Unit']
@@ -33,14 +35,14 @@ class AIGame(object):
                 (int): Current player's id
         '''
         self.map = generate_map(self.np_random)
-        self.players = [Player(i, self.np_random, sys.argv[i]) for i in range(self.num_players)]
+        self.players = [Player(self, i, self.np_random, sys.argv[i]) for i in range(self.num_players)]
         self.round = GameRound(self.num_players, self.np_random)
 
-        # Deal 7 cards to each player to prepare for the game
+        # Initialize the map for each player
         for player in self.players:
-            player.send_map(self.map)
+            player.send_init(self.map, self.num_players)
 
-    def step(self, action):
+    def step(self):
         ''' Get the next state
 
         Args:
@@ -68,47 +70,9 @@ class AIGame(object):
             (dict): The state of the player
         '''
         state = self.round.get_state(self.players, player_id)
-        state['player_num'] = self.get_player_num()
+        state['player_num'] = self.num_players
         state['current_player'] = self.round.current_player
         return state
-
-    def get_payoffs(self):
-        ''' Return the payoffs of the game
-
-        Returns:
-            (list): Each entry corresponds to the payoff of one player
-        '''
-        winner = self.round.winner
-        if winner is not None and len(winner) == 1:
-            self.payoffs[winner[0]] = 1
-            self.payoffs[1 - winner[0]] = -1
-        return self.payoffs
-
-    def get_legal_actions(self):
-        ''' Return the legal actions for current player
-
-        Returns:
-            (list): A list of legal actions
-        '''
-
-        return self.round.get_legal_actions(self.players, self.round.current_player)
-
-    def get_player_num(self):
-        ''' Return the number of players in Limit Texas Hold'em
-
-        Returns:
-            (int): The number of players in the game
-        '''
-        return self.num_players
-
-    @staticmethod
-    def get_action_num():
-        ''' Return the number of applicable actions
-
-        Returns:
-            (int): The number of actions. There are 61 actions
-        '''
-        return 61
 
     def get_player_id(self):
         ''' Return the current player's id
@@ -126,24 +90,21 @@ class AIGame(object):
         '''
         return self.round.is_over
 
-## For test
-# if __name__ == '__main__':
-#    #import time
-#    #random.seed(0)
-#    #start = time.time()
-#    game = UnoGame()
-#    for _ in range(1):
-#        state, button = game.init_game()
-#        print(button, state)
-#        i = 0
-#        while not game.is_over():
-#            i += 1
-#            legal_actions = game.get_legal_actions()
-#            print('legal_actions', legal_actions)
-#            action = np.random.choice(legal_actions)
-#            print('action', action)
-#            print()
-#            state, button = game.step(action)
-#            print(button, state)
-#        print(game.get_payoffs())
-#    print('step', i)
+    @property
+    def units(self):
+        return list(self._units.values())
+
+    @property
+    def groups(self):
+        return list(self._groups.values())
+
+    def create_unit(self, player, type):
+        u = units.Unit(self, self.unit_counter, player, type)
+        self.units[self.unit_counter] = u
+        self.unit_counter += 1
+        return u
+
+    def create_group(self, player, position):
+        group = units.Group(self, self.group_counter, player, position)
+        self._groups[self.group_counter] = group
+        self.group_counter += 1

@@ -11,7 +11,7 @@ from ai_game.games.uno.card import UnoCard as Card
 ROOT_PATH = rlcard.__path__[0]
 
 # a map of abstract action to its index and a list of abstract action
-with open(os.path.join(ROOT_PATH, 'games/uno/jsondata/action_space.json'), 'r') as file:
+with open(os.path.join(ROOT_PATH, 'games/aigame/jsondata/action_space.json'), 'r') as file:
     ACTION_SPACE = json.load(file, object_pairs_hook=OrderedDict)
     ACTION_LIST = list(ACTION_SPACE.keys())
 
@@ -29,7 +29,7 @@ WILD_DRAW_4 = ['r-wild_draw_4', 'g-wild_draw_4', 'b-wild_draw_4', 'y-wild_draw_4
 
 
 def init_deck():
-    ''' Generate uno deck of 108 cards
+    ''' Generate aigame deck of 108 cards
     '''
     deck = []
     card_info = Card.info

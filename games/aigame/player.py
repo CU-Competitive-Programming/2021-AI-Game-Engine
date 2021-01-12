@@ -4,6 +4,8 @@ import subprocess
 from collections import deque
 import select
 
+from games.aigame import units
+
 
 class Player(object):
     """
@@ -19,15 +21,19 @@ class Player(object):
 
     ACTION_TIMEOUT = 15  # seconds
 
-    def __init__(self, player_id, np_random, file_path):
+    def __init__(self, game, player_id, np_random, file_path):
         ''' Initilize a player.
         Args:
             player_id (int): The id of the player
         '''
+        self.game = game
         self.np_random = np_random
         self.player_id = player_id
         self.file_path = file_path
         self.action_buffer = deque()
+        self.error_buffer = deque()
+        self.balance = 0
+        self.send_buffer = deque()
 
         if file_path.endswith("py"):
             command = ["python"]
@@ -45,12 +51,6 @@ class Player(object):
             stderr=subprocess.PIPE
         )
 
-    def get_player_id(self):
-        ''' Return the id of the player
-        '''
-
-        return self.player_id
-
     def get_player_actions(self):
         outs, errs = [], []
         while True:
@@ -58,16 +58,33 @@ class Player(object):
             if not rr and not er:
                 break
             if rr:
-                outs.append(json.loads(self.proc.stdout.read(1024)))
+                self.action_buffer.append(json.loads(self.proc.stdout.read(1024)))
             if er:
-                errs.append(json.loads(self.proc.stderr.read(1024)))
+                self.error_buffer.append(json.loads(self.proc.stderr.read(1024)))
 
         return outs, errs
 
-    def send_map(self, map):
+    def send_init(self, map, num_players):
         tmap = map.tolist()
-        resp = dict(type="init", map=tmap)
+        resp = dict(type="init", map=tmap, player_id=self.player_id, num_players=num_players)
         try:
             bouts, berrs = self.proc.communicate(json.dumps(resp).encode(), timeout=self.ACTION_TIMEOUT)
+            self.action_buffer.extend(json.loads(x) for x in bouts.decode().split("\n"))
+            print(berrs.decode())
         except subprocess.TimeoutExpired:
             pass
+
+    def create_unit(self, type):
+        """Create a new unit in the game"""
+        # unit_command = {
+        #     'command': 'buy',
+        #     'type': type
+        # }
+        if self.balance < self.game.costs[type]:
+            raise ValueError("Can't afford to make that unit!")
+        self.balance -= self.game.costs[type]
+        return self.game.create_unit(self, type)
+
+    def create_group(self, position):
+        """Create a new group for the game"""
+        return self.game.create_group(self, position)

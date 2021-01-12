@@ -1,71 +1,161 @@
-from termcolor import colored
+from dataclasses import dataclass, field
+from typing import List, Callable, Optional
 
-class UnoCard(object):
+import numpy as np
 
-    info = {'type':  ['number', 'action', 'wild'],
-            'color': ['r', 'g', 'b', 'y'],
-            'trait': ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-                      'skip', 'reverse', 'draw_2', 'wild', 'wild_draw_4']
-            }
-
-    def __init__(self, card_type, color, trait):
-        ''' Initialize the class of UnoCard
-
-        Args:
-            card_type (str): The type of card
-            color (str): The color of card
-            trait (str): The trait of card
-        '''
-        self.type = card_type
-        self.color = color
-        self.trait = trait
-        self.str = self.get_str()
-
-    def get_str(self):
-        ''' Get the string representation of card
-
-        Return:
-            (str): The string of card's color and trait
-        '''
-        return self.color + '-' + self.trait
+from . import game, player
 
 
-    @staticmethod
-    def print_cards(cards, wild_color=False):
-        ''' Print out card in a nice form
+@dataclass(init=True, repr=True, eq=True)
+class Unit:  # use dataclass?
+    """A base class for all units on the field"""
+    game: 'game.Game'
+    id: int
+    owner: 'player.Player'  # owner_id
+    speed: int
+    health: int
+    attack: int
+    defense: int
+    view_range: int
+    attack_range: int
+    position: np.ndarray  # size 2, alternatively 2-tuple
 
-        Args:
-            card (str or list): The string form or a list of a UNO card
-            wild_color (boolean): True if assign collor to wild cards
-        '''
-        if isinstance(cards, str):
-            cards = [cards]
-        for i, card in enumerate(cards):
-            if card == 'draw':
-                trait = 'Draw'
-            else:
-                color, trait = card.split('-')
-                if trait == 'skip':
-                    trait = 'Skip'
-                elif trait == 'reverse':
-                    trait = 'Reverse'
-                elif trait == 'draw_2':
-                    trait = 'Draw-2'
-                elif trait == 'wild':
-                    trait = 'Wild'
-                elif trait == 'wild_draw_4':
-                    trait = 'Wild-Draw-4'
+    queued_moves: List[np.ndarray] = field(default_factory=list)
+    _group: 'Group' = field(default=None)  # This should only be modified from the relevant group object
 
-            if trait == 'Draw' or (trait[:4] == 'Wild' and not wild_color):
-                print(trait, end='')
-            elif color == 'r':
-                print(colored(trait, 'red'), end='')
-            elif color == 'g':
-                print(colored(trait, 'green'), end='')
-            elif color == 'b':
-                print(colored(trait, 'blue'), end='')
-            elif color == 'y':
-                print(colored(trait, 'yellow'), end='')
+    def move(self, npos) -> None:
+        """Move the unit to a new location. If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
+        assert len(npos) == 2, "New position must be length 2!"
+        if self._group is not None:
+            self._group.remove_member(self)
 
-            if i < len(cards) - 1:
-                print(', ', end='')
+        npos = np.array(npos)
+        diff = npos - self.position
+        dist = np.hypot(*diff)
+        if dist > self.speed:
+            diff = self.speed / dist * diff
+            self.queued_moves.append(npos)
+
+        self.position = (self.position + diff).astype(int)
+
+    def process_turn(self) -> None:
+        """If the unit has queued moves, perform the first queued move."""
+        if self.queued_moves:
+            self.move(self.queued_moves.pop())
+
+    def units_within(self, dist: float, check: Optional[Callable[['Unit'], bool]] = None) -> List['Unit']:
+        """Get a list of all units within the given distance of the unit.
+        Optionally pass a check function and only return units which pass the check."""
+        for unit in self.game.units:
+            if unit != self and check(unit) if check else True:
+                if np.hypot(*(unit.position - self.position)) <= dist:
+                    yield unit
+
+    def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
+        """Get a list of all groups within the given distance of the unit.
+        Optionally pass a check function and only return groups which pass the check."""
+        for group in self.game.groups:
+            if group != self and check(group) if check else True:
+                if np.hypot(*(group.position - self.position)) <= dist:
+                    yield group
+
+    def attack(self):
+        pass
+
+
+class Gatherer(Unit):
+    pass
+
+
+class WeakRanger(Unit):
+    pass
+
+
+class StrongRanger(Unit):
+    pass
+
+
+class WeakMelee(Unit):
+    pass
+
+
+class StrongMelee(Unit):
+    pass
+
+
+@dataclass(init=True, repr=True, eq=True)
+class Group:
+    """A group of units"""
+    game: 'game.Game'
+    id: int
+    owner: 'player.Player'
+    position: np.ndarray  # size 2 - alternatively 2-tuple
+
+    queued_moves: List[np.ndarray] = field(default_factory=list)
+
+    members: List[Unit] = field(default_factory=list)
+
+    @property
+    def size(self):
+        return len(self.members)
+
+    @property
+    def attack(self):
+        return sum(unit.attack for unit in self.members)
+
+    @property
+    def defense(self):
+        return sum(unit.defense for unit in self.members)
+
+    @property
+    def speed(self):
+        return min(self.members, key=lambda unit: unit.speed).speed if self.members else 1000000
+
+    def move(self, npos) -> None:
+        """Moves the group and all units in it to the specified location.
+         If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
+        assert len(npos) == 2, "New position must be length 2!"
+
+        npos = np.array(npos)
+        diff = npos - self.position
+        dist = np.hypot(*diff)
+        if dist > self.speed:
+            diff = self.speed / dist * diff
+            self.queued_moves.insert(0, npos)
+
+        for unit in self.members:
+            unit.move((npos + diff).astype(int))
+
+    def process_turn(self) -> None:
+        """If the unit has queued moves, perform the first queued move."""
+        if self.queued_moves:
+            self.move(self.queued_moves.pop())
+
+    def add_member(self, unit: Unit) -> None:
+        """Add a member to the group"""
+        assert np.hypot(*(unit.position - self.position)) < unit.speed, "Group too far away!"
+        assert unit.owner == self.owner, "The unit must belong to the same player as the group!"
+        unit.position = self.position
+        self.members.append(unit)
+        unit._group = self
+
+    def remove_member(self, unit: Unit) -> None:
+        """Remove a member from this group."""
+        self.members.remove(unit)
+        unit._group = None
+
+    def units_within(self, dist: float, check: Optional[Callable[[Unit], bool]] = None) -> List[Unit]:
+        """Get a list of all units within the given distance of the group.
+        Optionally pass a check function and only return units which pass the check."""
+        for unit in self.game.units:
+            if unit != self and check(unit) if check else True:
+                if np.hypot(*(unit.position - self.position)) <= dist:
+                    yield unit
+
+    def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
+        """Get a list of all groups within the given distance of the group.
+        Optionally pass a check function and only return groups which pass the check."""
+        for group in self.game.groups:
+            if group != self and check(group) if check else True:
+                if np.hypot(*(group.position - self.position)) <= dist:
+                    yield group
