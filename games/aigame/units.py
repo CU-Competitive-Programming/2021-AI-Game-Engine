@@ -1,3 +1,4 @@
+from collections import deque
 from dataclasses import dataclass, field
 from typing import List, Callable, Optional
 
@@ -20,7 +21,7 @@ class Unit:  # use dataclass?
     attack_range: int
     position: np.ndarray  # size 2, alternatively 2-tuple
 
-    queued_moves: List[np.ndarray] = field(default_factory=list)
+    queued_moves: List[np.ndarray] = field(default_factory=deque)
     _group: 'Group' = field(default=None)  # This should only be modified from the relevant group object
 
     def move(self, npos) -> None:

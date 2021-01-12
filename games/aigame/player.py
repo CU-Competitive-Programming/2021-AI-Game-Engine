@@ -17,6 +17,8 @@ class Player(object):
     - As players perform their actions, the outputs are sent at the end of the round, and a response to those actions will be awaited
     - Players will have the TIMEOUT window to send their actions for a round.
     - Players can conclude their turn with an action ENDTURN
+    - No more nonce, incorrect inputs will be met with a LOSS
+    - State is sent back each turn
     """
 
     ACTION_TIMEOUT = 15  # seconds
@@ -52,7 +54,6 @@ class Player(object):
         )
 
     def get_player_actions(self):
-        outs, errs = [], []
         while True:
             rr, wr, er = select.select([self.proc.stdout], [], [self.proc.stderr], 0)
             if not rr and not er:
@@ -62,17 +63,13 @@ class Player(object):
             if er:
                 self.error_buffer.append(json.loads(self.proc.stderr.read(1024)))
 
-        return outs, errs
+    def send_round_start(self):
+
 
     def send_init(self, map, num_players):
         tmap = map.tolist()
         resp = dict(type="init", map=tmap, player_id=self.player_id, num_players=num_players)
-        try:
-            bouts, berrs = self.proc.communicate(json.dumps(resp).encode(), timeout=self.ACTION_TIMEOUT)
-            self.action_buffer.extend(json.loads(x) for x in bouts.decode().split("\n"))
-            print(berrs.decode())
-        except subprocess.TimeoutExpired:
-            pass
+        self.proc.stdin.write(json.dumps(resp))
 
     def create_unit(self, type):
         """Create a new unit in the game"""

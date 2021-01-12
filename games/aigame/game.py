@@ -36,7 +36,8 @@ class AIGame(object):
         '''
         self.map = generate_map(self.np_random)
         self.players = [Player(self, i, self.np_random, sys.argv[i]) for i in range(self.num_players)]
-        self.round = GameRound(self.num_players, self.np_random)
+        self.round = GameRound(self.players, self.np_random)
+        self.costs = json.load(open("jsondata/unit_costs.json"))
 
         # Initialize the map for each player
         for player in self.players:
@@ -55,7 +56,7 @@ class AIGame(object):
                 (int): next plater's id
         '''
 
-        self.round.proceed_round(self.players)
+        self.round.proceed_round()
         player_id = self.round.current_player
         state = self.get_state(player_id)
         return state, player_id
@@ -73,22 +74,6 @@ class AIGame(object):
         state['player_num'] = self.num_players
         state['current_player'] = self.round.current_player
         return state
-
-    def get_player_id(self):
-        ''' Return the current player's id
-
-        Returns:
-            (int): current player's id
-        '''
-        return self.round.current_player
-
-    def is_over(self):
-        ''' Check if the game is over
-
-        Returns:
-            (boolean): True if the game is over
-        '''
-        return self.round.is_over
 
     @property
     def units(self):
@@ -108,3 +93,12 @@ class AIGame(object):
         group = units.Group(self, self.group_counter, player, position)
         self._groups[self.group_counter] = group
         self.group_counter += 1
+
+    def judge_winner(self):
+        ''' Judge the winner of the game
+        Args:
+            players (list): The list of players who play the game
+        Returns:
+            (list): The player id of the winner
+        '''
+        return max(self.players, key=lambda p: p.balance)
