@@ -1,83 +1,81 @@
 ''' Game-related and Env-related base classes
 '''
+from dataclasses import dataclass, field
+from typing import List, Optional, Callable
 
-class Card(object):
-    '''
-    Card stores the suit and rank of a single card
-    Note:
-        The suit variable in a standard card game should be one of [S, H, D, C, BJ, RJ] meaning [Spades, Hearts, Diamonds, Clubs, Black Joker, Red Joker]
-        Similarly the rank variable should be one of [A, 2, 3, 4, 5, 6, 7, 8, 9, T, J, Q, K]
-    '''
-
-    suit = None
-    rank = None
-    valid_suit = ['S', 'H', 'D', 'C', 'BJ', 'RJ']
-    valid_rank = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K']
-
-    def __init__(self, suit, rank):
-        ''' Initialize the suit and rank of a card
-        Args:
-            suit: string, suit of the card, should be one of valid_suit
-            rank: string, rank of the card, should be one of valid_rank
-        '''
-        self.suit = suit
-        self.rank = rank
-
-    def __eq__(self, other):
-        if isinstance(other, Card):
-            return self.rank == other.rank and self.suit == other.suit
-        else:
-            # don't attempt to compare against unrelated types
-            return NotImplemented
-
-    def __hash__(self):
-        suit_index = Card.valid_suit.index(self.suit)
-        rank_index = Card.valid_rank.index(self.rank)
-        return rank_index + 100 * suit_index
-
-    def __str__(self):
-        ''' Get string representation of a card.
-        Returns:
-            string: the combination of rank and suit of a card. Eg: AS, 5H, JD, 3C, ...
-        '''
-        return self.rank + self.suit
-
-    def get_index(self):
-        ''' Get index of a card.
-        Returns:
-            string: the combination of suit and rank of a card. Eg: 1S, 2H, AD, BJ, RJ...
-        '''
-        return self.suit+self.rank
+import numpy as np
 
 
-class Dealer(object):
-    ''' Dealer stores a deck of playing cards, remained cards
-    holded by dealer, and can deal cards to players
-    Note: deck variable means all the cards in a single game, and should be a list of Card objects.
-    '''
+@dataclass(init=True, repr=True, eq=True)
+class Unit:
+    game: 'Game'
+    id: int
+    owner: int  # owner_id
+    speed: int
+    health: int
+    attack: int
+    defense: int
+    view_range: int
+    attack_range: int
+    position: np.ndarray  # size 2, alternatively 2-tuple
 
-    deck = []
-    remained_cards = []
 
-    def __init__(self):
-        ''' The dealer should have all the cards at the beginning of a game
-        '''
+@dataclass(init=True, repr=True, eq=True)
+class Group:
+    """A group of units"""
+    game: 'game.Game'
+    id: int
+    owner: int
+    position: np.ndarray  # size 2 - alternatively 2-tuple
+
+    queued_moves: List[np.ndarray] = field(default_factory=list)
+
+    members: List[Unit] = field(default_factory=list)
+
+    @property
+    def size(self):
+        return len(self.members)
+
+    @property
+    def attack(self):
+        return sum(unit.attack for unit in self.members)
+
+    @property
+    def defense(self):
+        return sum(unit.defense for unit in self.members)
+
+    @property
+    def speed(self):
+        return min(self.members, key=lambda unit: unit.speed).speed
+
+    def move(self, npos) -> None:
         raise NotImplementedError
 
-    def shuffle(self):
-        ''' Shuffle the cards holded by dealer(remained_cards)
-        '''
+    def process_turn(self) -> None:
+        """If the unit has queued moves, perform the first queued move."""
         raise NotImplementedError
 
-    def deal_cards(self, **kwargs):
-        ''' Deal specific number of cards to a specific player
-        Args:
-            player_id: the id of the player to be dealt cards
-            num: number of cards to be dealt
-        '''
+    def add_member(self, unit: Unit) -> None:
+        """Add a member to the group"""
         raise NotImplementedError
 
-class Player(object):
+    def remove_member(self, unit: Unit) -> None:
+        """Remove a member from this group."""
+        self.members.remove(unit)
+        unit._group = None
+
+    def units_within(self, dist: float, check: Optional[Callable[[Unit], bool]] = None) -> List[Unit]:
+        """Get a list of all units within the given distance of the group.
+        Optionally pass a check function and only return units which pass the check."""
+        raise NotImplementedError
+
+    def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
+        """Get a list of all groups within the given distance of the group.
+        Optionally pass a check function and only return groups which pass the check."""
+        raise NotImplementedError
+
+
+class Player:
     ''' Player stores cards in the player's hand, and can determine the actions can be made according to the rules
     '''
 
@@ -100,6 +98,7 @@ class Player(object):
         ''' Player's actual action in the round
         '''
         raise NotImplementedError
+
 
 class Judger(object):
     ''' Judger decides whether the round/game ends and return the winner of the round/game

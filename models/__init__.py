@@ -11,6 +11,6 @@ installed_packages = [r.decode().split('==')[0] for r in reqs.split()]
 
 
 register(
-    model_id = 'uno-rule-v1',
+    model_id = 'aigame-rule-v1',
     entry_point='ai_game.models.uno_rule_models:UNORuleModelV1')
 

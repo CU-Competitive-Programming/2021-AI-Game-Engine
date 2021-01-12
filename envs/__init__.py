@@ -7,7 +7,7 @@ from ai_game.envs.registration import register, make
 
 
 register(
-    env_id='uno',
-    entry_point='ai_game.envs.uno:UnoEnv',
+    env_id='aigame',
+    entry_point='ai_game.envs.aigame:UnoEnv',
 )
 

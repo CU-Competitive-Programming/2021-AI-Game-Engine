@@ -1,10 +1,6 @@
-from rlcard.games.uno.card import UnoCard
-from rlcard.games.uno.utils import cards2list, WILD, WILD_DRAW_4
+class GameRound(object):
 
-
-class UnoRound(object):
-
-    def __init__(self, dealer, num_players, np_random):
+    def __init__(self, num_players, np_random):
         ''' Initialize the round class
 
         Args:
@@ -12,46 +8,12 @@ class UnoRound(object):
             num_players (int): the number of players in game
         '''
         self.np_random = np_random
-        self.dealer = dealer
-        self.target = None
         self.current_player = 0
         self.num_players = num_players
-        self.direction = 1
-        self.played_cards = []
         self.is_over = False
         self.winner = None
 
-    def flip_top_card(self):
-        ''' Flip the top card of the card pile
-
-        Returns:
-            (object of UnoCard): the top card in game
-
-        '''
-        top = self.dealer.flip_top_card()
-        if top.trait == 'wild':
-            top.color = self.np_random.choice(UnoCard.info['color'])
-        self.target = top
-        self.played_cards.append(top)
-        return top
-
-    def perform_top_card(self, players, top_card):
-        ''' Perform the top card
-
-        Args:
-            players (list): list of UnoPlayer objects
-            top_card (object): object of UnoCard
-        '''
-        if top_card.trait == 'skip':
-            self.current_player = 1
-        elif top_card.trait == 'reverse':
-            self.direction = -1
-            self.current_player = (0 + self.direction) % self.num_players
-        elif top_card.trait == 'draw_2':
-            player = players[self.current_player]
-            self.dealer.deal_cards(player, 2)
-
-    def proceed_round(self, players, action):
+    def proceed_round(self, players):
         ''' Call other Classes's functions to keep one round running
 
         Args:
@@ -155,13 +117,6 @@ class UnoRound(object):
         for player in players:
             state['card_num'].append(len(player.hand))
         return state
-
-    def replace_deck(self):
-        ''' Add cards have been played to deck
-        '''
-        self.dealer.deck.extend(self.played_cards)
-        self.dealer.shuffle()
-        self.played_cards = []
 
     def _perform_draw_action(self, players):
         # replace deck if there is no card in draw pile

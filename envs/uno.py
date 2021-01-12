@@ -10,7 +10,7 @@ from ai_game.games.uno.utils import cards2list
 class UnoEnv(Env):
 
     def __init__(self, config):
-        self.name = 'uno'
+        self.name = 'aigame'
         self.game = Game()
         super().__init__(config)
         self.state_shape = [7, 4, 15]
@@ -22,7 +22,7 @@ class UnoEnv(Env):
             model (Model): A Model object
         '''
         from ai_game import models
-        return models.load('uno-rule-v1')
+        return models.load('aigame-rule-v1')
 
     def _extract_state(self, state):
         obs = np.zeros((7, 4, 15), dtype=int)

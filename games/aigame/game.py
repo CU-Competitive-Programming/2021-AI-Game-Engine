@@ -1,18 +1,27 @@
 from copy import deepcopy
+from typing import Dict
+
 import numpy as np
 
-from ai_game.games.uno import Dealer
-from ai_game.games.uno import Player
-from ai_game.games.uno import Round
+from .map import generate_map
+from .player import Player
+from . import units
+from .round import GameRound
+import sys
 
+class AIGame(object):
+    _units: Dict[int, 'units.Unit']
+    _groups: Dict[int, 'units.Group']
+    turncount: int = 0
+    map: np.array = None
+    unit_counter: int = 0
+    group_counter: int = 0
+    costs: dict = None
+    player_id: int = None
 
-class UnoGame(object):
-
-    def __init__(self, allow_step_back=False):
-        self.allow_step_back = allow_step_back
-        self.np_random = np.random.RandomState()
-        self.num_players = 2
-        self.payoffs = [0 for _ in range(self.num_players)]
+    def __init__(self):
+        self.np_random = np.random.RandomState()  # This is a random state that will be the basis for our initialization
+        self.num_players = len(sys.argv)
 
     def init_game(self):
         ''' Initialize players and state
@@ -23,32 +32,13 @@ class UnoGame(object):
                 (dict): The first state in one game
                 (int): Current player's id
         '''
-        # Initalize payoffs
-        self.payoffs = [0 for _ in range(self.num_players)]
-
-        # Initialize a dealer that can deal cards
-        self.dealer = Dealer(self.np_random)
-
-        # Initialize four players to play the game
-        self.players = [Player(i, self.np_random) for i in range(self.num_players)]
+        self.map = generate_map(self.np_random)
+        self.players = [Player(i, self.np_random, sys.argv[i]) for i in range(self.num_players)]
+        self.round = GameRound(self.num_players, self.np_random)
 
         # Deal 7 cards to each player to prepare for the game
         for player in self.players:
-            self.dealer.deal_cards(player, 7)
-
-        # Initialize a Round
-        self.round = Round(self.dealer, self.num_players, self.np_random)
-
-        # flip and perfrom top card
-        top_card = self.round.flip_top_card()
-        self.round.perform_top_card(self.players, top_card)
-
-        # Save the hisory for stepping back to the last state.
-        self.history = []
-
-        player_id = self.round.current_player
-        state = self.get_state(player_id)
-        return state, player_id
+            player.send_map(self.map)
 
     def step(self, action):
         ''' Get the next state
@@ -63,28 +53,10 @@ class UnoGame(object):
                 (int): next plater's id
         '''
 
-        if self.allow_step_back:
-            # First snapshot the current state
-            his_dealer = deepcopy(self.dealer)
-            his_round = deepcopy(self.round)
-            his_players = deepcopy(self.players)
-            self.history.append((his_dealer, his_players, his_round))
-
-        self.round.proceed_round(self.players, action)
+        self.round.proceed_round(self.players)
         player_id = self.round.current_player
         state = self.get_state(player_id)
         return state, player_id
-
-    def step_back(self):
-        ''' Return to the previous state of the game
-
-        Returns:
-            (bool): True if the game steps back successfully
-        '''
-        if not self.history:
-            return False
-        self.dealer, self.players, self.round = self.history.pop()
-        return True
 
     def get_state(self, player_id):
         ''' Return player's state
@@ -154,9 +126,8 @@ class UnoGame(object):
         '''
         return self.round.is_over
 
-
 ## For test
-#if __name__ == '__main__':
+# if __name__ == '__main__':
 #    #import time
 #    #random.seed(0)
 #    #start = time.time()

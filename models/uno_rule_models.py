@@ -94,7 +94,7 @@ class UNORuleModelV1(Model):
     def __init__(self):
         ''' Load pretrained model
         '''
-        env = rlcard.make('uno')
+        env = rlcard.make('aigame')
 
         rule_agent = UNORuleAgentV1()
         self.rule_agents = [rule_agent for _ in range(env.player_num)]
