@@ -20,6 +20,8 @@ class Unit:  # use dataclass?
     view_range: int
     attack_range: int
     position: np.ndarray  # size 2, alternatively 2-tuple
+    attacked_this_round = False
+    moved_this_round = False
 
     queued_moves: List[np.ndarray] = field(default_factory=deque)
     _group: 'Group' = field(default=None)  # This should only be modified from the relevant group object
@@ -60,15 +62,18 @@ class Unit:  # use dataclass?
                 if np.hypot(*(group.position - self.position)) <= dist:
                     yield group
 
-    def attack(self):
-        pass
+    def serialize(self):
+        """Return a JSON representable instance of the unit"""
+        return dict(id=self.id, owner=self.owner.player_id, type='unit type')
 
 
 class Gatherer(Unit):
+    name = 'gatherer'
     pass
 
 
 class WeakRanger(Unit):
+    name = 'weakranger'
     pass
 
 
@@ -160,3 +165,7 @@ class Group:
             if group != self and check(group) if check else True:
                 if np.hypot(*(group.position - self.position)) <= dist:
                     yield group
+
+    def serialize(self):
+        """Return a JSON representable instance of the unit"""
+        return dict(id=self.id, owner=self.owner.player_id, members=[u.id for u in self.members])

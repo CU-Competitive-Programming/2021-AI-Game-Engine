@@ -1,10 +1,12 @@
 import json
 import os
 import subprocess
+import time
 from collections import deque
 import select
 
 from games.aigame import units
+import socket
 
 
 class Player(object):
@@ -34,7 +36,7 @@ class Player(object):
         self.file_path = file_path
         self.action_buffer = deque()
         self.error_buffer = deque()
-        self.balance = 0
+        self.balance = {'wood': 0, 'metal': 0}
         self.send_buffer = deque()
 
         if file_path.endswith("py"):
@@ -44,7 +46,7 @@ class Player(object):
         elif file_path.endswith(".out"):
             command = []
         else:
-            raise RuntimeError("Invalid file type!")
+            raise RuntimeError(f"Invalid file type: {file_path}")
 
         self.proc = subprocess.Popen(
             command + [file_path],
@@ -53,23 +55,41 @@ class Player(object):
             stderr=subprocess.PIPE
         )
 
-    def get_player_actions(self):
-        while True:
-            rr, wr, er = select.select([self.proc.stdout], [], [self.proc.stderr], 0)
+    @staticmethod
+    def get_player_actions(players: list, eventtype: str, timeout: int = 5):
+        """Its a staticmethod so it can run for all players at once.
+        Send end_move to mark end of move phase early
+        """
+        player_files = {player.proc.stdout: player for player in players}
+        player_errors = {player.proc.stderr: player for player in players}
+        end = time.monotonic() + timeout
+        while player_files and time.monotonic() < end:
+            rr, wr, er = select.select(player_files.keys(), [], player_errors.keys(), 0)  # check input nowait
             if not rr and not er:
                 break
-            if rr:
-                self.action_buffer.append(json.loads(self.proc.stdout.read(1024)))
-            if er:
-                self.error_buffer.append(json.loads(self.proc.stderr.read(1024)))
+            for efile in er:
+                player_files[efile].error_buffer.append(json.loads(efile.read(1024)))
+            for rfile in rr:
+                respvalue = json.loads(rfile.read(1024))
+                if respvalue.get("action") != "end_" + eventtype:
+                    player_files[rfile].action_buffer.append(respvalue)
+                else:
+                    del player_files[rfile]
+                    del player_errors[rfile]
 
-    def send_round_start(self):
-
+    def send_part_start(self, turncount, eventtype):
+        gamestate = self.game.get_state()
+        resp = dict(type="part_start", turn=turncount, part=eventtype, state=gamestate)
+        self.proc.stdin.write(
+            json.dumps(resp).encode()
+        )
 
     def send_init(self, map, num_players):
         tmap = map.tolist()
         resp = dict(type="init", map=tmap, player_id=self.player_id, num_players=num_players)
-        self.proc.stdin.write(json.dumps(resp))
+        self.proc.stdin.write(
+            json.dumps(resp).encode()
+        )
 
     def create_unit(self, type):
         """Create a new unit in the game"""
@@ -85,3 +105,14 @@ class Player(object):
     def create_group(self, position):
         """Create a new group for the game"""
         return self.game.create_group(self, position)
+
+    def __str__(self):
+        return f"Player({self.player_id}, path='{self.file_path}')"
+
+    @property
+    def units(self):
+        return [unit for unit in self.game.units if unit.owner == self]
+
+    @property
+    def groups(self):
+        return [group for group in self.game.group if group.owner == self]

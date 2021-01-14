@@ -10,6 +10,10 @@ from . import units
 from .round import GameRound
 import sys
 
+from .unit_costs import unit_costs
+
+ROUND_COUNT = 1000
+
 
 class AIGame(object):
     _units: Dict[int, 'units.Unit']
@@ -20,10 +24,24 @@ class AIGame(object):
     group_counter: int = 0
     costs: dict = None
     player_id: int = None
+    players = ()
+    round = None
 
-    def __init__(self):
+    def __init__(self, paths):
+        self._units = {}
+        self._groups = {}
+
         self.np_random = np.random.RandomState()  # This is a random state that will be the basis for our initialization
         self.num_players = len(sys.argv)
+        self.players = [Player(self, i, self.np_random, paths[i]) for i in range(self.num_players)]
+        self.round = GameRound(self, self.players, self.np_random)
+
+    def run(self):
+        self.init_game()
+        for i in range(ROUND_COUNT):
+            self.step(i)
+
+        print(self.round.winner)
 
     def init_game(self):
         ''' Initialize players and state
@@ -35,45 +53,19 @@ class AIGame(object):
                 (int): Current player's id
         '''
         self.map = generate_map(self.np_random)
-        self.players = [Player(self, i, self.np_random, sys.argv[i]) for i in range(self.num_players)]
-        self.round = GameRound(self.players, self.np_random)
-        self.costs = json.load(open("jsondata/unit_costs.json"))
+        self.costs = unit_costs
 
         # Initialize the map for each player
         for player in self.players:
             player.send_init(self.map, self.num_players)
 
-    def step(self):
+    def step(self, round_number: int):
         ''' Get the next state
 
-        Args:
-            action (str): A specific action
-
-        Returns:
-            (tuple): Tuple containing:
-
-                (dict): next player's state
-                (int): next plater's id
+            :param round_number: int
         '''
 
-        self.round.proceed_round()
-        player_id = self.round.current_player
-        state = self.get_state(player_id)
-        return state, player_id
-
-    def get_state(self, player_id):
-        ''' Return player's state
-
-        Args:
-            player_id (int): player id
-
-        Returns:
-            (dict): The state of the player
-        '''
-        state = self.round.get_state(self.players, player_id)
-        state['player_num'] = self.num_players
-        state['current_player'] = self.round.current_player
-        return state
+        self.round.proceed_round(round_number)
 
     @property
     def units(self):
@@ -102,3 +94,16 @@ class AIGame(object):
             (list): The player id of the winner
         '''
         return max(self.players, key=lambda p: p.balance)
+
+    def get_unit(self, id: int, player: Player = None) -> 'units.Unit':
+        unit = self.units[id]
+        if unit.owner != player:
+            raise RuntimeError(f"Attempted to control unit belonging to other player! {player}, {unit.owner}")
+
+        return unit
+
+    def get_state(self):
+        state = {}
+        state['units'] = [unit.serialize() for unit in self.units]
+        state['groups'] = [group.serialize() for group in self.groups]
+        state['players'] = {player.player_id: player.balance for player in self.players}
