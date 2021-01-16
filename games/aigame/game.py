@@ -32,7 +32,7 @@ class AIGame(object):
         self._groups = {}
 
         self.np_random = np.random.RandomState()  # This is a random state that will be the basis for our initialization
-        self.num_players = len(sys.argv)
+        self.num_players = len(paths)
         self.players = [Player(self, i, self.np_random, paths[i]) for i in range(self.num_players)]
         self.round = GameRound(self, self.players, self.np_random)
 
