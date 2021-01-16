@@ -19,16 +19,20 @@ class Unit:  # use dataclass?
     defense: int
     view_range: int
     attack_range: int
+    collect_amount: int
     position: np.ndarray  # size 2, alternatively 2-tuple
     attacked_this_round = False
     moved_this_round = False
+    collected_this_round = False
 
     queued_moves: List[np.ndarray] = field(default_factory=deque)
     _group: 'Group' = field(default=None)  # This should only be modified from the relevant group object
 
-    def move(self, npos) -> None:
+    def move(self, npos, new=True) -> None:
         """Move the unit to a new location. If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
         assert len(npos) == 2, "New position must be length 2!"
+        if new:
+            self.queued_moves.clear()
         if self._group is not None:
             self._group.remove_member(self)
 
@@ -41,10 +45,10 @@ class Unit:  # use dataclass?
 
         self.position = (self.position + diff).astype(int)
 
-    def process_turn(self) -> None:
+    def proceed(self) -> None:
         """If the unit has queued moves, perform the first queued move."""
         if self.queued_moves:
-            self.move(self.queued_moves.pop())
+            self.move(self.queued_moves.pop(), new=False)
 
     def units_within(self, dist: float, check: Optional[Callable[['Unit'], bool]] = None) -> List['Unit']:
         """Get a list of all units within the given distance of the unit.
@@ -117,10 +121,12 @@ class Group:
     def speed(self):
         return min(self.members, key=lambda unit: unit.speed).speed if self.members else 1000000
 
-    def move(self, npos) -> None:
+    def move(self, npos, new=True) -> None:
         """Moves the group and all units in it to the specified location.
          If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
         assert len(npos) == 2, "New position must be length 2!"
+        if new: # clear moves if its a new command
+            self.queued_moves.clear()
 
         npos = np.array(npos)
         diff = npos - self.position
@@ -132,10 +138,10 @@ class Group:
         for unit in self.members:
             unit.move((npos + diff).astype(int))
 
-    def process_turn(self) -> None:
+    def proceed(self) -> None:
         """If the unit has queued moves, perform the first queued move."""
         if self.queued_moves:
-            self.move(self.queued_moves.pop())
+            self.move(self.queued_moves.pop(), new=False)
 
     def add_member(self, unit: Unit) -> None:
         """Add a member to the group"""

@@ -8,11 +8,10 @@ from .map import generate_map
 from .player import Player
 from . import units
 from .round import GameRound
-import sys
 
-from .unit_costs import unit_costs
+from .unit_costs import unit_costs, unit_stats
 
-ROUND_COUNT = 1000
+ROUND_COUNT = 400
 
 
 class AIGame(object):
@@ -54,10 +53,13 @@ class AIGame(object):
         '''
         self.map = generate_map(self.np_random)
         self.costs = unit_costs
+        self.unit_stats = unit_stats
 
         # Initialize the map for each player
         for player in self.players:
-            player.send_init(self.map, self.num_players)
+            player.send_init(self.map, self.num_players, self.costs)
+
+        print(self.map)
 
     def step(self, round_number: int):
         ''' Get the next state
@@ -76,7 +78,7 @@ class AIGame(object):
         return list(self._groups.values())
 
     def create_unit(self, player, type):
-        u = units.Unit(self, self.unit_counter, player, type)
+        u = units.Unit(self, self.unit_counter, player, type, **self.unit_stats[type])
         self.units[self.unit_counter] = u
         self.unit_counter += 1
         return u
@@ -103,8 +105,9 @@ class AIGame(object):
         return unit
 
     def get_state(self):
-        state = {}
-        state['units'] = [unit.serialize() for unit in self.units]
-        state['groups'] = [group.serialize() for group in self.groups]
-        state['players'] = {player.player_id: player.balance for player in self.players}
+        state = {
+            'units': [unit.serialize() for unit in self.units],
+            'groups': [group.serialize() for group in self.groups],
+            'players': {player.player_id: player.balance for player in self.players}
+        }
         return state

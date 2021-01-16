@@ -56,7 +56,7 @@ class Player(object):
         )
 
     @staticmethod
-    def get_player_actions(players: list, eventtype: str, timeout: int = 5):
+    def get_player_actions(players: list, eventtype: str, timeout: int = .2):
         """Its a staticmethod so it can run for all players at once.
         Send end_move to mark end of move phase early
         """
@@ -88,14 +88,15 @@ class Player(object):
             json.dumps(resp).encode()
         )
 
-    def send_init(self, map, num_players):
+    def send_init(self, map, num_players, costs):
         tmap = map.tolist()
         resp = dict(
             type="init",
             map=tmap,
             player_id=self.player_id,
             num_players=num_players,
-            balance=self.balance
+            balance=self.balance,
+            costs=costs
         )
 
 
