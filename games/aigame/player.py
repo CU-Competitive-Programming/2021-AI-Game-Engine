@@ -36,7 +36,7 @@ class Player(object):
         self.file_path = file_path
         self.action_buffer = deque()
         self.error_buffer = deque()
-        self.balance = {'wood': 0, 'metal': 0}
+        self.balance = {'wood': 15, 'metal': 15}
         self.send_buffer = deque()
 
         if file_path.endswith("py"):
@@ -64,7 +64,7 @@ class Player(object):
         player_errors = {player.proc.stderr: player for player in players}
         end = time.monotonic() + timeout
         while player_files and time.monotonic() < end:
-            rr, wr, er = select.select(player_files.keys(), [], player_errors.keys(), 0)  # check input nowait
+            rr, wr, er = select.select(player_files.keys(), [], player_errors.keys(), 0.1)  # check input nowait
             if not rr and not er:
                 break
             for efile in er:
@@ -77,6 +77,7 @@ class Player(object):
                     del player_files[rfile]
                     del player_errors[rfile]
 
+        print(time.monotonic(), end)
         print(players[0].action_buffer)
 
     def send_part_start(self, turncount, eventtype):
@@ -88,7 +89,15 @@ class Player(object):
 
     def send_init(self, map, num_players):
         tmap = map.tolist()
-        resp = dict(type="init", map=tmap, player_id=self.player_id, num_players=num_players)
+        resp = dict(
+            type="init",
+            map=tmap,
+            player_id=self.player_id,
+            num_players=num_players,
+            balance=self.balance
+        )
+
+
         self.proc.stdin.write(
             json.dumps(resp).encode()
         )
