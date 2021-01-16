@@ -63,7 +63,7 @@ class Player(object):
         player_files = {player.proc.stdout: player for player in players}
         player_errors = {player.proc.stderr: player for player in players}
         end = time.monotonic() + timeout
-        while player_files and time.monotonic() < end:
+        while time.monotonic() < end:
             rr, wr, er = select.select(player_files.keys(), [], player_errors.keys(), 0.1)  # check input nowait
             if not rr and not er:
                 break
@@ -76,6 +76,9 @@ class Player(object):
                 else:
                     del player_files[rfile]
                     del player_errors[rfile]
+
+                    if not player_files:
+                        break
 
         print(time.monotonic(), end, player_files)
         print(players[0].action_buffer)
