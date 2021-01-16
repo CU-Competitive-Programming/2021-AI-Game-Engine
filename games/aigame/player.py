@@ -77,7 +77,7 @@ class Player(object):
                     del player_files[rfile]
                     del player_errors[rfile]
 
-        print(time.monotonic(), end)
+        print(time.monotonic(), end, player_files)
         print(players[0].action_buffer)
 
     def send_part_start(self, turncount, eventtype):
