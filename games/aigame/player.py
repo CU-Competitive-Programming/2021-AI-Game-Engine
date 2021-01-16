@@ -65,8 +65,6 @@ class Player(object):
         end = time.monotonic() + timeout
         while time.monotonic() < end:
             rr, wr, er = select.select(player_files.keys(), [], player_errors.keys(), 0.1)  # check input nowait
-            if not rr and not er:
-                break
             for efile in er:
                 player_files[efile].error_buffer.append(json.loads(efile.read(1024)))
             for rfile in rr:
