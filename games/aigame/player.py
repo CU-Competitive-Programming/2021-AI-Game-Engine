@@ -40,7 +40,7 @@ class Player(object):
         self.send_buffer = deque()
 
         if file_path.endswith("py"):
-            command = ["python"]
+            command = ["python3.8"]
         elif file_path.endswith("jar"):
             command = ["java", "-jar"]
         elif file_path.endswith(".out"):

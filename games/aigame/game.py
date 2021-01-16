@@ -107,3 +107,4 @@ class AIGame(object):
         state['units'] = [unit.serialize() for unit in self.units]
         state['groups'] = [group.serialize() for group in self.groups]
         state['players'] = {player.player_id: player.balance for player in self.players}
+        return state
