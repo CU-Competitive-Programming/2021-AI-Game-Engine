@@ -77,6 +77,8 @@ class Player(object):
                     del player_files[rfile]
                     del player_errors[rfile]
 
+        print(players[0].action_buffer)
+
     def send_part_start(self, turncount, eventtype):
         gamestate = self.game.get_state()
         resp = dict(type="part_start", turn=turncount, part=eventtype, state=gamestate)
