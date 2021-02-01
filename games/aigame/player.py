@@ -2,11 +2,13 @@ import json
 import os
 import subprocess
 import time
-from collections import deque
+from collections import deque, defaultdict
 import select
 
 from games.aigame import units
 import socket
+
+import threading
 
 
 class Player(object):
@@ -40,7 +42,7 @@ class Player(object):
         self.send_buffer = deque()
 
         if file_path.endswith("py"):
-            command = ["python3.8"]
+            command = ["python"]
         elif file_path.endswith("jar"):
             command = ["java", "-jar"]
         elif file_path.endswith(".out"):
@@ -55,31 +57,35 @@ class Player(object):
             stderr=subprocess.PIPE
         )
 
+        self.turn_events: dict[str, threading.Event] = defaultdict(threading.Event)
+
+    def handle_input_daemon(self):
+        while True:
+            respvalue = json.loads(self.proc.stdout.read(1024))
+            print(f"RECEIVED INPUT FROM {self}: {respvalue}")
+            if not respvalue.get("action").startswith("end_"):
+                self.action_buffer.append(respvalue)
+            else:
+                self.turn_events[respvalue.get("action").split("_")[1]].set()
+
+    def handle_error_daemon(self):
+        self.error_buffer.append(json.loads(self.proc.stderr.read(1024)))
+
     @staticmethod
     def get_player_actions(players: list, eventtype: str, timeout: int = .2):
         """Its a staticmethod so it can run for all players at once.
         Send end_move to mark end of move phase early
         """
-        player_files = {player.proc.stdout: player for player in players}
-        player_errors = {player.proc.stderr: player for player in players}
+
         end = time.monotonic() + timeout
         while time.monotonic() < end:
-            rr, wr, er = select.select(player_files.keys(), [], player_errors.keys(), 0.1)  # check input nowait
-            for efile in er:
-                player_files[efile].error_buffer.append(json.loads(efile.read(1024)))
-            for rfile in rr:
-                respvalue = json.loads(rfile.read(1024))
-                if respvalue.get("action") != "end_" + eventtype:
-                    player_files[rfile].action_buffer.append(respvalue)
-                else:
-                    del player_files[rfile]
-                    del player_errors[rfile]
+            if all(player.turn_events[eventtype].is_set() for player in players):
+                break
 
-                    if not player_files:
-                        break
-
-        print(time.monotonic(), end, player_files)
-        print(players[0].action_buffer)
+        for player in players:
+            player.turn_events[eventtype].clear()
+        # print(time.monotonic(), end)
+        # print(players[0].action_buffer)
 
     def send_part_start(self, turncount, eventtype):
         gamestate = self.game.get_state()
@@ -98,7 +104,6 @@ class Player(object):
             balance=self.balance,
             costs=costs
         )
-
 
         self.proc.stdin.write(
             json.dumps(resp).encode()

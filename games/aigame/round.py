@@ -104,6 +104,10 @@ class GameRound(object):
         return tiles
 
     def dispatch_move(self, actor: 'units.Unit', pos: tuple[int, 2]):
+        """
+        Payload:
+
+        """
         if pos[0] < 0 or pos[1] < 0:
             raise RuntimeError(f"Invalid coordinate pair {pos}")
         if pos[0] >= len(self.game.map[0]) or pos[1] >= len(self.game.map[1]):
