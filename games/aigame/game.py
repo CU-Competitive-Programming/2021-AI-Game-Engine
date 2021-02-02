@@ -1,4 +1,5 @@
 import json
+import time
 from copy import deepcopy
 from typing import Dict
 
@@ -29,6 +30,7 @@ class AIGame(object):
     def __init__(self, paths):
         self._units = {}
         self._groups = {}
+        self.output = []
 
         self.np_random = np.random.RandomState()  # This is a random state that will be the basis for our initialization
         self.num_players = len(paths)
@@ -46,6 +48,8 @@ class AIGame(object):
             player.proc.kill()
 
         print(self.judge_winner())
+        with open(f"output-{time.time()}.json", 'w') as outfile:
+            json.dump(self.output, outfile, indent=4)
 
     def init_game(self):
         ''' Initialize players and state

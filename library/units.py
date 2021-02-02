@@ -1,19 +1,18 @@
+import numpy as np
+
 from collections import deque
 from dataclasses import dataclass, field
 from typing import List, Callable, Optional, Union
 
-import numpy as np
-
-from . import game, player
-from .utils import raycast
+from library.utils import raycast
 
 
 @dataclass(init=True, repr=True, eq=True)
 class Unit:  # use dataclass?
     """A base class for all units on the field"""
-    game: 'game.Game'
+    bot: 'bot.Bot'
     id: int
-    owner: 'player.Player'  # owner_id
+    owner: int  # owner_id
     speed: int
     health: int
     attack: int
@@ -25,15 +24,15 @@ class Unit:  # use dataclass?
     attacked_this_round = False
     moved_this_round = False
     collected_this_round = False
-    name = None
 
+    queued_moves: List[np.ndarray] = field(default_factory=deque)
     _group: 'Group' = field(default=None)  # This should only be modified from the relevant group object
 
-    def move(self, npos) -> None:  # , new=True
+    def move(self, npos, new=True) -> None:
         """Move the unit to a new location. If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
         assert len(npos) == 2, "New position must be length 2!"
-        # if new:
-        #     self.queued_moves.clear()
+        if new:
+            self.queued_moves.clear()
         if self._group is not None:
             self._group.remove_member(self)
 
@@ -42,26 +41,24 @@ class Unit:  # use dataclass?
         dist = np.hypot(*diff)
         if dist > self.speed:
             diff = self.speed / dist * diff
-            # self.queued_moves.append(npos)
+            self.queued_moves.append(npos)
 
         for step in raycast(self.position, self.position + diff):
-            if self.game.map[tuple(step)] == 1:
+            if self.bot.map[tuple(step)] == 1:
                 raise RuntimeError(f"{self} attempted invalid move to or through impassable tile {self}")
 
         self.position = (self.position + diff).astype(int)
+        self.bot.send(dict(command='move', unit=self.id, destination=npos))
 
-    # NOTE: Code moved to client side
-    # queued_moves: List[np.ndarray] = field(default_factory=deque)
-    #
-    # def proceed(self) -> None:
-    #     """If the unit has queued moves, perform the first queued move."""
-    #     if self.queued_moves:
-    #         self.move(self.queued_moves.pop(), new=False)
+    def proceed(self) -> None:
+        """If the unit has queued moves, perform the first queued move."""
+        if self.queued_moves:
+            self.move(self.queued_moves.pop(), new=False)
 
     def units_within(self, dist: float, check: Optional[Callable[['Unit'], bool]] = None) -> List['Unit']:
         """Get a list of all units within the given distance of the unit.
         Optionally pass a check function and only return units which pass the check."""
-        for unit in self.game.units:
+        for unit in self.bot.units:
             if unit != self and check(unit) if check else True:
                 if np.hypot(*(unit.position - self.position)) <= dist:
                     yield unit
@@ -69,15 +66,28 @@ class Unit:  # use dataclass?
     def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
         """Get a list of all groups within the given distance of the unit.
         Optionally pass a check function and only return groups which pass the check."""
-        for group in self.game.groups:
+        for group in self.bot.groups:
             if group != self and check(group) if check else True:
                 if np.hypot(*(group.position - self.position)) <= dist:
                     yield group
 
-    def serialize(self):
-        """Return a JSON representable instance of the unit"""
-        return dict(id=self.id, owner=self.owner.player_id, type=self.name)
+    def attack_unit(self, target):
+        if np.linalg.norm(self.position, target.position) > self.attack_range:
+            raise RuntimeError(f"{self} attempted to hit out of his range!")
 
+        if self.owner == target.owner:
+            raise RuntimeError("Attempted to attack own unit!")
+
+        self.bot.send(command='attack', unit=self.id, target=target.id)
+
+    def nearest_nodes(self):
+        nodes = np.indices(self.bot.map)[self.bot.map[(self.bot.map == 3) | (self.bot.map == 4)]]
+        yield from sorted(nodes, key=lambda index: np.linalg.norm(self.position, index))
+
+    def collect(self):
+        if not self.bot.map[self.position] in (3, 4):
+            raise RuntimeError(f"{self} is not on a resource node!")
+        self.bot.send(dict(command='collect', unit=self.id))
 
 class Gatherer(Unit):
     name = 'gatherer'
@@ -104,10 +114,12 @@ class StrongMelee(Unit):
 @dataclass(init=True, repr=True, eq=True)
 class Group:
     """A group of units"""
-    game: 'game.Game'
+    bot: 'Bot'
     id: int
-    owner: 'player.Player'
+    owner: int
     position: np.ndarray  # size 2 - alternatively 2-tuple
+
+    queued_moves: List[np.ndarray] = field(default_factory=list)
 
     members: List[Unit] = field(default_factory=list)
 
@@ -131,29 +143,27 @@ class Group:
         """Moves the group and all units in it to the specified location.
          If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
         assert len(npos) == 2, "New position must be length 2!"
-        # if new:  # clear moves if its a new command
-        #     self.queued_moves.clear()
+        if new:  # clear moves if its a new command
+            self.queued_moves.clear()
 
         npos = np.array(npos)
         diff = npos - self.position
         dist = np.hypot(*diff)
         if dist > self.speed:
             diff = self.speed / dist * diff
+            self.queued_moves.insert(0, npos)
 
         for step in raycast(self.position, self.position + diff):
-            if self.game.map[tuple(step)] == 1:
+            if self.bot.map[tuple(step)] == 1:
                 raise RuntimeError(f"{self} attempted invalid move to or through impassable tile {self}")
 
         for unit in self.members:
             unit.move((npos + diff).astype(int))
 
-    # NOTE: Code moved to client
-    # queued_moves: List[np.ndarray] = field(default_factory=list)
-    #
-    # def proceed(self) -> None:
-    #     """If the unit has queued moves, perform the first queued move."""
-    #     if self.queued_moves:
-    #         self.move(self.queued_moves.pop(), new=False)
+    def proceed(self) -> None:
+        """If the unit has queued moves, perform the first queued move."""
+        if self.queued_moves:
+            self.move(self.queued_moves.pop(), new=False)
 
     def add_member(self, unit: Unit) -> None:
         """Add a member to the group"""
@@ -171,7 +181,7 @@ class Group:
     def units_within(self, dist: float, check: Optional[Callable[[Unit], bool]] = None) -> List[Unit]:
         """Get a list of all units within the given distance of the group.
         Optionally pass a check function and only return units which pass the check."""
-        for unit in self.game.units:
+        for unit in self.bot.units:
             if unit != self and check(unit) if check else True:
                 if np.hypot(*(unit.position - self.position)) <= dist:
                     yield unit
@@ -179,7 +189,7 @@ class Group:
     def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
         """Get a list of all groups within the given distance of the group.
         Optionally pass a check function and only return groups which pass the check."""
-        for group in self.game.groups:
+        for group in self.bot.groups:
             if group != self and check(group) if check else True:
                 if np.hypot(*(group.position - self.position)) <= dist:
                     yield group

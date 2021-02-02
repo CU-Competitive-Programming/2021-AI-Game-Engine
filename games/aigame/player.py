@@ -75,10 +75,10 @@ class Player(object):
                 while "\n" in buffer:
                     data, buffer = buffer.split("\n", 1)
                     respvalue = json.loads(data)
-                    if not respvalue.get("action").startswith("end_"):
+                    if not respvalue.get("command").startswith("end_"):
                         self.action_buffer.append(respvalue)
                     else:
-                        self.turn_events[respvalue.get("action").split("_")[1]].set()
+                        self.turn_events[respvalue.get("command").split("_")[1]].set()
         except:
             raise RuntimeError(f"Invalid input from user {self}")
 
@@ -117,7 +117,7 @@ class Player(object):
         if self.proc.stdin.closed:
             raise RuntimeError("Pipe is closed!")
 
-        resp = dict(winner=winner.player_id, type="game_end")
+        resp = dict(winners=winner.player_id, type="end_game")
 
         self.proc.stdin.write(
             json.dumps(resp) + "\r\n"
@@ -126,7 +126,7 @@ class Player(object):
     def send_init(self, map, num_players, costs):
         tmap = map.tolist()
         resp = dict(
-            type="init",
+            type="initialize",
             map=tmap,
             player_id=self.player_id,
             num_players=num_players,
@@ -147,7 +147,7 @@ class Player(object):
         #     'command': 'buy',
         #     'type': type
         # }
-        if self.balance < self.game.costs[type]:
+        if any(self.balance[cur] > self.game.costs[type][cur] for cur in self.game.costs[type]):
             raise ValueError("Can't afford to make that unit!")
         self.balance -= self.game.costs[type]
         return self.game.create_unit(self, type)

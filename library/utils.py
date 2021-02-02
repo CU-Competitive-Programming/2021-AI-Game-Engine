@@ -1,9 +1,5 @@
-import os
-import json
 from typing import Union
-
 import numpy as np
-
 
 def raycast(start: Union[tuple[int, 2], np.ndarray], end: tuple[int, 2]) -> set[tuple]:
     """
