@@ -44,7 +44,7 @@ class GameRound(object):
             unit.collected_this_round = False
 
         for etype in ["attack", "move", "collect", "spawn"]:
-            self.game.output[etype] = self.game.get_state()
+            self.game.output[-1][etype] = self.game.get_state()
 
             for player in self.players:
                 player.send_part_start(round_number, etype)
@@ -99,16 +99,17 @@ class GameRound(object):
     def dispatch_spawn(self, player, unit_type):
         if unit_type not in self.game.costs:
             raise RuntimeError(f"{player} attempted to buy invalid unit {unit_type}")
-        if any(player.balance[cur] > self.game.costs[unit_type][cur] for cur in self.game.costs[unit_type]):
+
+        if any(player.balance.get(cur, 0) < self.game.costs[unit_type][cur] for cur in self.game.costs[unit_type]):
             raise RuntimeError(f"{player} attempted to buy {unit_type} without enough money")
 
-        player.balance = {x: y - player.balance.get(x, 0) for x, y in self.game.costs['unit_type'].items()}
+        player.balance = {x: player.balance[x] - y for x, y in self.game.costs[unit_type].items()}
         self.game.create_unit(player, unit_type)
 
     def dispatch_actions(self, etype):
         for player in self.players:
             newactions = deque()
-            for action in player.action_buffer:
+            for action in player.action_buffer.copy():
                 if action['command'] == etype:
                     if etype == 'attack':
                         attacker = self.game.get_unit(action['unit'], player)

@@ -1,9 +1,11 @@
 import json
+import sys
+from contextlib import redirect_stderr
+import random
+
 import numpy as np
 
 from library import units
-
-init = json.loads(input())
 
 
 class Bot:
@@ -17,15 +19,13 @@ class Bot:
     balance = None
     costs = None
 
-    def __init__(self, do_logging=True):
+    def __init__(self, logging_events=('in', 'out', 'calls')):
         self._units = {}
         self._groups = {}
         self.output = []
         self.player_balances = {}
 
-        self.do_logging = do_logging
-        if do_logging:
-            self.outfile = open(f"outfile-{init['player_id']}.log", 'a')
+        self.logging_events = logging_events
 
     @property
     def myunits(self):
@@ -43,27 +43,46 @@ class Bot:
     def groups(self):
         return list(self._groups.values())
 
+    def log(self, *data):
+        for item in data:
+            if isinstance(item, (dict, list, tuple)):
+                self.outfile.write(json.dumps(item) + "\n")
+            else:
+                self.outfile.write(item + "\n")
+
     def send(self, payload: dict) -> None:
         """Send a payload to the game"""
         if not isinstance(payload, str):
             payload = json.dumps(payload)
 
-        print(payload)
-        self.outfile.write(payload + "\n")
+        sys.stdout.write(payload + "\r\n")
+        #print(payload)
+        if 'out' in self.logging_events:
+            self.log(payload)
 
     def run(self) -> None:
         """
         Run the bot until the game ends
         """
-        self.running = True
-        while self.running:
-            event = json.loads(input())
-            getattr(self, f"on_{event['initialize']}_raw")(event)
+        init = json.loads(input())
+        self.on_initialize_raw(init)
+        self.outfile = open(f"outfile-{self.player_id}.log", 'w')
+        if 'in' in self.logging_events:
+            self.log(json.dumps(init))
 
-        if self.do_logging:
-            self.outfile.close()
+        with redirect_stderr(self.outfile):
+            try:
+                self.running = True
+                while self.running:
+                    # event = self.readline()
+                    event = json.loads(input())
+                    if 'in' in self.logging_events:
+                        self.log(json.dumps(event))
+                    getattr(self, f"on_{event['type']}_raw")(event)
+            finally:
+                self.outfile.close()
 
-    def on_init_raw(self, payload):
+    def on_initialize_raw(self, payload):
         self.map = np.array(payload['map'])
         self.player_id = payload['player_id']
         self.num_players = payload['num_players']
@@ -77,13 +96,14 @@ class Bot:
     def _update_state(self, newstate):
         self.balance = newstate['players'][str(self.player_id)]
         self.player_balances = newstate['players']
-        self._units = [units.Unit(**data) for data in newstate['units']]
-        self._groups = [units.Group(**data) for data in newstate['groups']]
+        self._units = {data['id']: units.Unit(**data) for data in newstate['units']}
+        self._groups = {data['id']: units.Group(**data) for data in newstate['groups']}
 
     def create_unit(self, type):
+        #self.log(self.balance, self.costs[type])
         if type not in self.costs:
             raise RuntimeError("Invalid unit type!")
-        if any(self.balance[cur] > self.costs[type][cur] for cur in self.costs[type]):
+        if any(self.balance[cur] < self.costs[type][cur] for cur in self.costs[type]):
             raise RuntimeError(f"Cannot afford to buy unit {type}")
         self.send(dict(command='spawn', unit_type=type))
     #
@@ -92,7 +112,7 @@ class Bot:
 
     def on_part_start_raw(self, payload):
         part = payload['part']
-        self.turn = payload['turncount']
+        self.turn = payload['turn']
         self._update_state(payload['state'])
         getattr(self, f"on_{part}_start")()
 

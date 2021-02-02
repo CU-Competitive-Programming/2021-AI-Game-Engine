@@ -40,6 +40,7 @@ class Player(object):
         self.error_buffer = ""
         self.balance = {'wood': 15, 'metal': 15}
         self.send_buffer = deque()
+        self.home = 0,0
 
         if file_path.endswith("py"):
             command = ["python"]
@@ -55,26 +56,25 @@ class Player(object):
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            universal_newlines=True
+            #universal_newlines=True
         )
 
         self.turn_events: dict[str, threading.Event] = defaultdict(threading.Event)
         self.readthread = threading.Thread(target=self.handle_input_daemon)
         self.errorthread = threading.Thread(target=self.handle_error_daemon)
-        self.readthread.start()
-        self.errorthread.start()
 
     def handle_input_daemon(self):
         try:
-            buffer = ""
-            while True:
+            buffer = b""
+            while self.game.running:
                 new = self.proc.stdout.read(1024)
                 if not new:
                     return
                 buffer += new
-                while "\n" in buffer:
-                    data, buffer = buffer.split("\n", 1)
+                while b"\n" in buffer:
+                    data, buffer = buffer.split(b"\n", 1)
                     respvalue = json.loads(data)
+                    print(respvalue)
                     if not respvalue.get("command").startswith("end_"):
                         self.action_buffer.append(respvalue)
                     else:
@@ -83,9 +83,10 @@ class Player(object):
             raise RuntimeError(f"Invalid input from user {self}")
 
     def handle_error_daemon(self):
-        while True:
-            data = self.proc.stderr.read(64)
-            self.error_buffer += data
+        while self.game.running:
+            print(self.proc.stderr.read(64), end="")
+            #data = self.proc.stderr.read(64)
+            #self.error_buffer += data
 
     @staticmethod
     def get_player_actions(players: list, eventtype: str, timeout: int = .2):
@@ -110,7 +111,7 @@ class Player(object):
         if self.proc.stdin.closed:
             raise RuntimeError("Pipe is closed!")
         self.proc.stdin.write(
-            json.dumps(resp) + "\r\n"
+            json.dumps(resp).encode() + b"\r\n"
         )
 
     def send_winner(self, winner: 'Player'):
@@ -120,7 +121,7 @@ class Player(object):
         resp = dict(winners=winner.player_id, type="end_game")
 
         self.proc.stdin.write(
-            json.dumps(resp) + "\r\n"
+            json.dumps(resp).encode() + b"\r\n"
         )
 
     def send_init(self, map, num_players, costs):
@@ -138,7 +139,7 @@ class Player(object):
             raise RuntimeError("Pipe is closed!")
 
         self.proc.stdin.write(
-            json.dumps(resp) + "\r\n"
+            json.dumps(resp).encode() + b"\r\n"
         )
 
     def create_unit(self, type):
@@ -147,7 +148,7 @@ class Player(object):
         #     'command': 'buy',
         #     'type': type
         # }
-        if any(self.balance[cur] > self.game.costs[type][cur] for cur in self.game.costs[type]):
+        if any(self.balance[cur] < self.game.costs[type][cur] for cur in self.game.costs[type]):
             raise ValueError("Can't afford to make that unit!")
         self.balance -= self.game.costs[type]
         return self.game.create_unit(self, type)

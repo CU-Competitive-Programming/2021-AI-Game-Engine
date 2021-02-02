@@ -26,6 +26,7 @@ class AIGame(object):
     player_id: int = None
     players = ()
     round = None
+    running = False
 
     def __init__(self, paths):
         self._units = {}
@@ -38,6 +39,7 @@ class AIGame(object):
         self.round = GameRound(self, self.players, self.np_random)
 
     def run(self):
+        self.running = True
         self.init_game()
         for i in range(ROUND_COUNT):
             print(i)
@@ -50,6 +52,7 @@ class AIGame(object):
         print(self.judge_winner())
         with open(f"output-{time.time()}.json", 'w') as outfile:
             json.dump(self.output, outfile, indent=4)
+        self.running = False
 
     def init_game(self):
         ''' Initialize players and state
@@ -67,6 +70,8 @@ class AIGame(object):
         # Initialize the map for each player
         for player in self.players:
             player.send_init(self.map, self.num_players, self.costs)
+            player.readthread.start()
+            player.errorthread.start()
 
         print(self.map)
 
@@ -87,8 +92,8 @@ class AIGame(object):
         return list(self._groups.values())
 
     def create_unit(self, player, type):
-        u = units.Unit(self, self.unit_counter, player, type, **self.unit_stats[type])
-        self.units[self.unit_counter] = u
+        u = units.Unit(self, self.unit_counter, player, type, position=player.home, **self.unit_stats[type])
+        self._units[self.unit_counter] = u
         self.unit_counter += 1
         return u
 

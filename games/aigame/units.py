@@ -14,6 +14,7 @@ class Unit:  # use dataclass?
     game: 'game.Game'
     id: int
     owner: 'player.Player'  # owner_id
+    type: str
     speed: int
     health: int
     attack: int
@@ -25,7 +26,6 @@ class Unit:  # use dataclass?
     attacked_this_round = False
     moved_this_round = False
     collected_this_round = False
-    name = None
 
     _group: 'Group' = field(default=None)  # This should only be modified from the relevant group object
 
@@ -76,7 +76,19 @@ class Unit:  # use dataclass?
 
     def serialize(self):
         """Return a JSON representable instance of the unit"""
-        return dict(id=self.id, owner=self.owner.player_id, type=self.name)
+        return dict(
+            id=self.id,
+            owner=self.owner.player_id,
+            type=self.type,
+            speed=self.speed,
+            health=self.health,
+            attack=self.attack,
+            defense=self.defense,
+            attack_range=self.attack_range,
+            view_range=self.view_range,
+            collect_amount=self.collect_amount,
+            position=list(self.position)
+        )
 
 
 class Gatherer(Unit):
