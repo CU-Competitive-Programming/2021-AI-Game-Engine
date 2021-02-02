@@ -11,7 +11,7 @@ from .round import GameRound
 
 from .unit_costs import unit_costs, unit_stats
 
-ROUND_COUNT = 400
+ROUND_COUNT = 10
 
 
 class AIGame(object):
@@ -38,9 +38,14 @@ class AIGame(object):
     def run(self):
         self.init_game()
         for i in range(ROUND_COUNT):
+            print(i)
             self.step(i)
 
-        print(self.round.winner)
+        for player in self.players:
+            player.send_winner(self.judge_winner())
+            player.proc.kill()
+
+        print(self.judge_winner())
 
     def init_game(self):
         ''' Initialize players and state
@@ -88,14 +93,14 @@ class AIGame(object):
         self._groups[self.group_counter] = group
         self.group_counter += 1
 
-    def judge_winner(self):
+    def judge_winner(self) -> Player:
         ''' Judge the winner of the game
         Args:
             players (list): The list of players who play the game
         Returns:
             (list): The player id of the winner
         '''
-        return max(self.players, key=lambda p: p.balance)
+        return max(self.players, key=lambda p: sum(p.balance.values()))
 
     def get_unit(self, id: int, player: Player = None) -> 'units.Unit':
         unit = self.units[id]

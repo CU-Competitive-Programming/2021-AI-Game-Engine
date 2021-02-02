@@ -6,3 +6,4 @@ game = AIGame(
     ["example_bot.py"] * 2
 )
 game.run()
+print("ITS OVER")

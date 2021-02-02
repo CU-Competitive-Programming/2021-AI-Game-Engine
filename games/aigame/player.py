@@ -37,7 +37,7 @@ class Player(object):
         self.player_id = player_id
         self.file_path = file_path
         self.action_buffer = deque()
-        self.error_buffer = deque()
+        self.error_buffer = ""
         self.balance = {'wood': 15, 'metal': 15}
         self.send_buffer = deque()
 
@@ -54,22 +54,38 @@ class Player(object):
             command + [file_path],
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            universal_newlines=True
         )
 
         self.turn_events: dict[str, threading.Event] = defaultdict(threading.Event)
+        self.readthread = threading.Thread(target=self.handle_input_daemon)
+        self.errorthread = threading.Thread(target=self.handle_error_daemon)
+        self.readthread.start()
+        self.errorthread.start()
 
     def handle_input_daemon(self):
-        while True:
-            respvalue = json.loads(self.proc.stdout.read(1024))
-            print(f"RECEIVED INPUT FROM {self}: {respvalue}")
-            if not respvalue.get("action").startswith("end_"):
-                self.action_buffer.append(respvalue)
-            else:
-                self.turn_events[respvalue.get("action").split("_")[1]].set()
+        try:
+            buffer = ""
+            while True:
+                new = self.proc.stdout.read(1024)
+                if not new:
+                    return
+                buffer += new
+                while "\n" in buffer:
+                    data, buffer = buffer.split("\n", 1)
+                    respvalue = json.loads(data)
+                    if not respvalue.get("action").startswith("end_"):
+                        self.action_buffer.append(respvalue)
+                    else:
+                        self.turn_events[respvalue.get("action").split("_")[1]].set()
+        except:
+            raise RuntimeError(f"Invalid input from user {self}")
 
     def handle_error_daemon(self):
-        self.error_buffer.append(json.loads(self.proc.stderr.read(1024)))
+        while True:
+            data = self.proc.stderr.read(64)
+            self.error_buffer += data
 
     @staticmethod
     def get_player_actions(players: list, eventtype: str, timeout: int = .2):
@@ -90,8 +106,21 @@ class Player(object):
     def send_part_start(self, turncount, eventtype):
         gamestate = self.game.get_state()
         resp = dict(type="part_start", turn=turncount, part=eventtype, state=gamestate)
+
+        if self.proc.stdin.closed:
+            raise RuntimeError("Pipe is closed!")
         self.proc.stdin.write(
-            json.dumps(resp).encode()
+            json.dumps(resp) + "\r\n"
+        )
+
+    def send_winner(self, winner: 'Player'):
+        if self.proc.stdin.closed:
+            raise RuntimeError("Pipe is closed!")
+
+        resp = dict(winner=winner.player_id, type="game_end")
+
+        self.proc.stdin.write(
+            json.dumps(resp) + "\r\n"
         )
 
     def send_init(self, map, num_players, costs):
@@ -105,8 +134,11 @@ class Player(object):
             costs=costs
         )
 
+        if self.proc.stdin.closed:
+            raise RuntimeError("Pipe is closed!")
+
         self.proc.stdin.write(
-            json.dumps(resp).encode()
+            json.dumps(resp) + "\r\n"
         )
 
     def create_unit(self, type):
