@@ -27,6 +27,7 @@ class AIGame(object):
     players = ()
     round = None
     running = False
+    turn = None
 
     def __init__(self, paths):
         self._units = {}
@@ -41,9 +42,9 @@ class AIGame(object):
     def run(self):
         self.running = True
         self.init_game()
-        for i in range(ROUND_COUNT):
-            print(i)
-            self.step(i)
+        for self.turn in range(ROUND_COUNT):
+            print(self.turn)
+            self.step(self.turn)
 
         for player in self.players:
             player.send_winner(self.judge_winner())

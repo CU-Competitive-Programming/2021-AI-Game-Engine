@@ -97,6 +97,7 @@ class GameRound(object):
             raise RuntimeError(f"{actor} attempted invalid collect tile {tuple(actor.position)}!")
 
     def dispatch_spawn(self, player, unit_type):
+        print(player, player.balance, self.game.costs[unit_type])
         if unit_type not in self.game.costs:
             raise RuntimeError(f"{player} attempted to buy invalid unit {unit_type}")
 

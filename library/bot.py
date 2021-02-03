@@ -52,6 +52,7 @@ class Bot:
 
     def send(self, payload: dict) -> None:
         """Send a payload to the game"""
+        payload['turn'] = self.turn
         if not isinstance(payload, str):
             payload = json.dumps(payload)
 
@@ -103,8 +104,12 @@ class Bot:
         #self.log(self.balance, self.costs[type])
         if type not in self.costs:
             raise RuntimeError("Invalid unit type!")
-        if any(self.balance[cur] < self.costs[type][cur] for cur in self.costs[type]):
+        if any(self.balance.get(cur, 0) < self.costs[type][cur] for cur in self.costs[type]):
             raise RuntimeError(f"Cannot afford to buy unit {type}")
+
+        for cur, amount in self.costs[type].items():
+            self.balance[cur] -= amount
+
         self.send(dict(command='spawn', unit_type=type))
     #
     # def create_group(self, position):

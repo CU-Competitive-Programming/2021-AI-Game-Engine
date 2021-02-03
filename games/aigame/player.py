@@ -74,7 +74,7 @@ class Player(object):
                 while b"\n" in buffer:
                     data, buffer = buffer.split(b"\n", 1)
                     respvalue = json.loads(data)
-                    print(respvalue)
+                    print(self.player_id, self.game.turn, respvalue)
                     if not respvalue.get("command").startswith("end_"):
                         self.action_buffer.append(respvalue)
                     else:
@@ -142,16 +142,16 @@ class Player(object):
             json.dumps(resp).encode() + b"\r\n"
         )
 
-    def create_unit(self, type):
-        """Create a new unit in the game"""
-        # unit_command = {
-        #     'command': 'buy',
-        #     'type': type
-        # }
-        if any(self.balance[cur] < self.game.costs[type][cur] for cur in self.game.costs[type]):
-            raise ValueError("Can't afford to make that unit!")
-        self.balance -= self.game.costs[type]
-        return self.game.create_unit(self, type)
+    # def create_unit(self, type):
+    #     """Create a new unit in the game"""
+    #     # unit_command = {
+    #     #     'command': 'buy',
+    #     #     'type': type
+    #     # }
+    #     if any(self.balance[cur] < self.game.costs[type][cur] for cur in self.game.costs[type]):
+    #         raise ValueError("Can't afford to make that unit!")
+    #     self.balance -= self.game.costs[type]
+    #     return self.game.create_unit(self, type)
 
     def create_group(self, position):
         """Create a new group for the game"""
