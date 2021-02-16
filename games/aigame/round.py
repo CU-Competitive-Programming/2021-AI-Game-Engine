@@ -36,7 +36,7 @@ class GameRound(object):
         attack, move, collect, spawn
         '''
 
-        self.game.output.append({})
+        self.game.output['turns'].append({})
 
         for unit in self.game.units:
             unit.attacked_this_round = False
@@ -44,7 +44,7 @@ class GameRound(object):
             unit.collected_this_round = False
 
         for etype in ["attack", "move", "collect", "spawn"]:
-            self.game.output[-1][etype] = self.game.get_state()
+            self.game.output['turns'][-1][etype] = self.game.get_state()
 
             for player in self.players:
                 player.send_part_start(round_number, etype)

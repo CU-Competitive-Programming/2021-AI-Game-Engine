@@ -32,7 +32,7 @@ class AIGame(object):
     def __init__(self, paths):
         self._units = {}
         self._groups = {}
-        self.output = []
+        self.output = dict(init=None, turns=[])
 
         self.np_random = np.random.RandomState()  # This is a random state that will be the basis for our initialization
         self.num_players = len(paths)
@@ -73,6 +73,8 @@ class AIGame(object):
             player.send_init(self.map, self.num_players, self.costs)
             player.readthread.start()
             player.errorthread.start()
+
+        self.output['init'] = dict(map=self.map.tolist(), num_players=self.num_players, unit_costs=self.costs)
 
         print(self.map)
 

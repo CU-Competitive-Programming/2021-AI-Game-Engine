@@ -198,3 +198,6 @@ fabric.properties
 # mac shit
 .DS_STORE
 .idea/
+
+outfile-*.log
+output-*.json
