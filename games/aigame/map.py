@@ -59,14 +59,16 @@ def generate_map(np_random):
     world = np.zeros(shape)
     for i in range(shape[0]):
         for j in range(shape[1]):
-            world[i][j] = noise.pnoise2(i / scale,
-                                        j / scale,
-                                        octaves=octaves,
-                                        persistence=persistence,
-                                        lacunarity=lacunarity,
-                                        repeatx=shape[0],
-                                        repeaty=shape[1],
-                                        base=d)
+            world[i][j] = noise.pnoise2(
+                i / scale,
+                j / scale,
+                octaves=octaves,
+                persistence=persistence,
+                lacunarity=lacunarity,
+                repeatx=shape[0],
+                repeaty=shape[1],
+                base=d
+            )
 
     # world *= scale
     # world += 50

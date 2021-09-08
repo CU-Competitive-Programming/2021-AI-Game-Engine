@@ -5,7 +5,7 @@ from library import Bot
 
 class AIBot(Bot):
     def on_attack_start(self):
-        # self.log("attack start!")
+        self.log("attack start!")
         for unit in self.myunits:
             if unit.attack_range > 0:
                 for enemy in unit.units_within(unit.attack_range, lambda u: u.owner != self.player_id):
@@ -15,7 +15,7 @@ class AIBot(Bot):
         self.end_attack()
 
     def on_move_start(self):
-        # self.log("move start!")
+        self.log("move start!")
         for unit in self.myunits:
             if unit.collect_amount > 0:
                 for position in unit.nearest_nodes():
@@ -29,7 +29,7 @@ class AIBot(Bot):
         self.end_move()
 
     def on_collect_start(self):
-        # self.log("collect start!")
+        self.log("collect start!")
         for unit in self.myunits:
             if unit.collect_amount > 0:
                 if self.map[unit.position] in (3, 4):
