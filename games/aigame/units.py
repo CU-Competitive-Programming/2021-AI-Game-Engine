@@ -62,8 +62,8 @@ class Unit:  # use dataclass?
         """Get a list of all units within the given distance of the unit.
         Optionally pass a check function and only return units which pass the check."""
         for unit in self.game.units:
-            if unit != self and check(unit) if check else True:
-                if np.hypot(*(unit.position - self.position)) <= dist:
+            if ((unit != self) and check(unit)) if check else True:
+                if np.hypot(*(np.array(unit.position) - np.array(self.position))) <= dist:
                     yield unit
 
     def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
@@ -185,7 +185,7 @@ class Group:
         Optionally pass a check function and only return units which pass the check."""
         for unit in self.game.units:
             if unit != self and check(unit) if check else True:
-                if np.hypot(*(unit.position - self.position)) <= dist:
+                if np.hypot(*(np.array(unit.position) - np.array(self.position))) <= dist:
                     yield unit
 
     def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:

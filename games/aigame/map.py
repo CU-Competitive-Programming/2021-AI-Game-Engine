@@ -3,11 +3,11 @@ import numpy as np
 
 
 def norm(x):
-    if x < -0.15:
-        return 1
+    # if x < -0.15:
+    #     return 1
     # elif x < 0:
     #     return 1
-    elif x < 1.0:
+    if x < 1.0:
         return 0
 
     # if -.2 < x < 0.2:
@@ -72,6 +72,13 @@ def generate_map(np_random):
 
     # world *= scale
     # world += 50
+    indices = np.random.choice(world.shape[1] * world.shape[0], replace=False,
+                               size=int(world.shape[1] * world.shape[0] * 0.2))
+    # print(np.indices(world.shape))
+    world = vf(world)
 
-    world = np.array(mirror([mirror(sublist) for sublist in world]))
-    return vf(world)
+    for i in range(10):
+        world[np.random.choice(world.shape[0]), np.random.choice(world.shape[1])] = 3
+    for i in range(10):
+        world[np.random.choice(world.shape[0]), np.random.choice(world.shape[1])] = 4
+    return np.array(mirror([mirror(sublist) for sublist in world]))

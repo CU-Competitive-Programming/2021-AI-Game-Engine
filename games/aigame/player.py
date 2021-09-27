@@ -1,6 +1,8 @@
 import json
 import os
+import queue
 import subprocess
+import sys
 import time
 from collections import deque, defaultdict
 import select
@@ -9,6 +11,8 @@ from games.aigame import units
 import socket
 
 import threading
+
+from games.aigame.utils import json_dumps
 
 
 class Player(object):
@@ -36,14 +40,14 @@ class Player(object):
         self.np_random = np_random
         self.player_id = player_id
         self.file_path = file_path
-        self.action_buffer = deque()
+        self.action_buffer = defaultdict(lambda: defaultdict(deque))
         self.error_buffer = ""
         self.balance = {'wood': 15, 'metal': 15}
         self.send_buffer = deque()
-        self.home = 0,0
+        self.home = 0, 0
 
         if file_path.endswith("py"):
-            command = ["python"]
+            command = [sys.executable]
         elif file_path.endswith("jar"):
             command = ["java", "-jar"]
         elif file_path.endswith(".out"):
@@ -52,52 +56,59 @@ class Player(object):
             raise RuntimeError(f"Invalid file type: {file_path}")
 
         self.proc = subprocess.Popen(
-            command + [file_path],
-            stdout=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            #universal_newlines=True
+            command + [file_path, '6667'],
+            # stdout=subprocess.PIPE,
+            # stdin=subprocess.PIPE,
+            # stderr=subprocess.PIPE,
+            # universal_newlines=True
         )
+        (self.sock, address) = self.game.server.accept()
 
-        self.turn_events: dict[str, threading.Event] = defaultdict(threading.Event)
+        self.turn_events: dict[dict[str, threading.Event]] = defaultdict(lambda: defaultdict(threading.Event))
         self.readthread = threading.Thread(target=self.handle_input_daemon)
-        self.errorthread = threading.Thread(target=self.handle_error_daemon)
+        # self.errorthread = threading.Thread(target=self.handle_error_daemon)
 
     def handle_input_daemon(self):
         try:
             buffer = b""
             while self.game.running:
-                new = self.proc.stdout.read(1024)
+                new = self.sock.recv(1024)
                 if not new:
                     return
                 buffer += new
                 while b"\n" in buffer:
                     data, buffer = buffer.split(b"\n", 1)
                     respvalue = json.loads(data)
-                    print(self.player_id, self.game.turn, respvalue)
                     if not respvalue.get("command").startswith("end_"):
-                        self.action_buffer.append(respvalue)
+                        self.action_buffer[respvalue['turn']][respvalue['part']].append(respvalue)
                     else:
-                        self.turn_events[respvalue.get("command").split("_")[1]].set()
-        except:
-            raise RuntimeError(f"Invalid input from user {self}")
+                        self.turn_events[respvalue['turn']][respvalue.get("command").split("_")[1]].set()
+        except Exception as e:
+            raise RuntimeError(f"Invalid input from player {self.player_id}") from e
 
     def handle_error_daemon(self):
         while self.game.running:
-            print(self.proc.stderr.read(64), end="")
-            #data = self.proc.stderr.read(64)
-            #self.error_buffer += data
+            r = self.proc.stderr.read(64)
+            if not r:
+                raise RuntimeError(f"{self} closed pipe")
+            print(r.decode(), end="", file=sys.stderr)
+            # data = self.proc.stderr.read(64)
+            # self.error_buffer += data
 
     @staticmethod
-    def get_player_actions(players: list, eventtype: str, timeout: int = .2):
+    def get_player_actions(players: list, eventtype: str, turn: int, timeout: int = 3):
         """Its a staticmethod so it can run for all players at once.
         Send end_move to mark end of move phase early
         """
 
         end = time.monotonic() + timeout
         while time.monotonic() < end:
-            if all(player.turn_events[eventtype].is_set() for player in players):
+            if all(player.turn_events[turn][eventtype].is_set() for player in players):
+                print("BREAKING OUT!")
                 break
+            time.sleep(0.001)
+
+        # print([{**player.turn_events[turn]} for player in players])
 
         for player in players:
             player.turn_events[eventtype].clear()
@@ -108,21 +119,23 @@ class Player(object):
         gamestate = self.game.get_state()
         resp = dict(type="part_start", turn=turncount, part=eventtype, state=gamestate)
 
-        if self.proc.stdin.closed:
-            raise RuntimeError("Pipe is closed!")
-        self.proc.stdin.write(
-            json.dumps(resp).encode() + b"\r\n"
+        # if self.sock.closed:
+        #     raise RuntimeError("Pipe is closed!")
+        self.sock.send(
+            json_dumps(resp).encode() + b"\r\n"
         )
+        # self.sock.flush()
 
     def send_winner(self, winner: 'Player'):
-        if self.proc.stdin.closed:
-            raise RuntimeError("Pipe is closed!")
+        # if self.sock.closed:
+        #     raise RuntimeError("Pipe is closed!")
 
         resp = dict(winners=winner.player_id, type="end_game")
 
-        self.proc.stdin.write(
-            json.dumps(resp).encode() + b"\r\n"
+        self.sock.send(
+            json_dumps(resp).encode() + b"\r\n"
         )
+        # self.sock.flush()
 
     def send_init(self, map, num_players, costs):
         tmap = map.tolist()
@@ -135,12 +148,13 @@ class Player(object):
             costs=costs
         )
 
-        if self.proc.stdin.closed:
-            raise RuntimeError("Pipe is closed!")
+        # if self.sock.closed:
+        #     raise RuntimeError("Pipe is closed!")
 
-        self.proc.stdin.write(
-            json.dumps(resp).encode() + b"\r\n"
+        self.sock.send(
+            json_dumps(resp).encode() + b"\r\n"
         )
+        # self.sock.flush()
 
     # def create_unit(self, type):
     #     """Create a new unit in the game"""
@@ -158,7 +172,7 @@ class Player(object):
         return self.game.create_group(self, position)
 
     def __str__(self):
-        return f"Player({self.player_id}, path='{self.file_path}')"
+        return f"Player({self.player_id}, path='{self.file_path}', bal={self.balance})"
 
     @property
     def units(self):

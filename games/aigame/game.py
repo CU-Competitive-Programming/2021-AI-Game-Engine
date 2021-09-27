@@ -1,5 +1,7 @@
 import json
+import socket
 import time
+from collections import Counter
 from copy import deepcopy
 from typing import Dict
 
@@ -11,8 +13,9 @@ from . import units
 from .round import GameRound
 
 from .unit_costs import unit_costs, unit_stats
+from .utils import NpEncoder
 
-ROUND_COUNT = 10
+ROUND_COUNT = 50
 
 
 class AIGame(object):
@@ -36,6 +39,11 @@ class AIGame(object):
 
         self.np_random = np.random.RandomState()  # This is a random state that will be the basis for our initialization
         self.num_players = len(paths)
+
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.bind(('localhost', 6667))
+        self.server.listen(self.num_players)
+
         self.players = [Player(self, i, self.np_random, paths[i]) for i in range(self.num_players)]
         self.round = GameRound(self, self.players, self.np_random)
 
@@ -50,9 +58,13 @@ class AIGame(object):
             player.send_winner(self.judge_winner())
             player.proc.kill()
 
-        print(self.judge_winner())
+        print(time.time(), "THE WINNER IS", self.judge_winner())
+        print(time.time(), "PLAYERS: ", *self.players)
+        print("UNITS:", len(self.units))
+        print("PLAYER UNITS:", {player.player_id: len(player.units) for player in self.players})
+        print(Counter(unit.type for unit in self.units))
         with open(f"output-{time.time()}.json", 'w') as outfile:
-            json.dump(self.output, outfile, indent=4)
+            json.dump(self.output, outfile, indent=4, cls=NpEncoder)
         self.running = False
 
     def init_game(self):
@@ -72,18 +84,13 @@ class AIGame(object):
         for player in self.players:
             player.send_init(self.map, self.num_players, self.costs)
             player.readthread.start()
-            player.errorthread.start()
+            # player.errorthread.start()
 
         self.output['init'] = dict(map=self.map.tolist(), num_players=self.num_players, unit_costs=self.costs)
 
         print(self.map)
 
     def step(self, round_number: int):
-        ''' Get the next state
-
-            :param round_number: int
-        '''
-
         self.round.proceed_round(round_number)
 
     @property
@@ -116,7 +123,7 @@ class AIGame(object):
 
     def get_unit(self, id: int, player: Player = None) -> 'units.Unit':
         unit = self.units[id]
-        if unit.owner != player:
+        if player and unit.owner != player:
             raise RuntimeError(f"Attempted to control unit belonging to other player! {player}, {unit.owner}")
 
         return unit

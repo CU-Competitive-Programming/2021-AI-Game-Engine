@@ -18,10 +18,17 @@ class AIBot(Bot):
         self.log("attack start!")
         for unit in self.myunits:
             if unit.attack_range > 0:
-                nearby = sorted(unit.units_within(unit.attack_range, lambda u: u.owner != self.player_id), key=unit.dist_to)
-                for enemy in nearby:
-                    unit.attack_unit(enemy)
-                    break
+                nearby = list(unit.units_within(unit.attack_range, lambda u: u.owner != self.player_id))
+                nearby.sort(key=lambda x: (unit.dist_to(x), -x.collect_amount))
+
+                print(f"DISTANCES:", [(unit.dist_to(u), -u.collect_amount) for u in nearby], file=sys.stderr)
+                if nearby:
+                    unit.attack_unit(nearby[0])
+                    print(f"1 ATTACKING UNIT: {nearby[0].collect_amount} {unit.dist_to(nearby[0])}", file=sys.stderr)
+                # for enemy in nearby:
+                #     print(f"1 ATTACKING UNIT: {unit.collect_amount} {unit.dist_to(enemy)}", file=sys.stderr)
+                #     unit.attack_unit(enemy)
+                #     break
 
         self.end_attack()
 
@@ -40,7 +47,8 @@ class AIBot(Bot):
                         unit.move(position)
                         break
             elif unit.attack > 0:
-                for enemy in sorted(self.enemyunits, key=lambda e: np.hypot(*(np.array(unit.position) - np.array(e.position)))):
+                for enemy in sorted(self.enemyunits, key=lambda e: (-e.collect_amount, np.hypot(*(np.array(unit.position) - np.array(e.position))))):
+                    print(f"MOVING TOWARD {enemy.collect_amount} DIST {unit.dist_to(enemy)}", file=sys.stderr)
                     unit.move(enemy.position)
                     break
 
@@ -61,10 +69,14 @@ class AIBot(Bot):
 
         print(self.balance, file=sys.stderr)
 
-        for utype, cost in self.costs.items():
-            if all(self.balance[x] - y >= 0 for x, y in cost.items()):
-                print(f"Spawning unit {utype}", file=sys.stderr)
-                self.create_unit(utype)
+        bought = True
+        while bought:
+            bought = False
+            for utype, cost in self.costs.items():
+                if all(self.balance[x] - y >= 0 for x, y in cost.items()):
+                    print(f"Spawning unit {utype}", file=sys.stderr)
+                    self.create_unit(utype)
+                    bought = True
 
         self.end_spawn()
 

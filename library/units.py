@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 
 from collections import deque
@@ -7,7 +9,7 @@ from typing import List, Callable, Optional, Union
 from library.utils import raycast
 
 
-@dataclass(init=True, repr=True, eq=True)
+@dataclass(init=True, repr=True)
 class Unit:  # use dataclass?
     """A base class for all units on the field"""
     bot: 'bot.Bot'
@@ -24,9 +26,16 @@ class Unit:  # use dataclass?
     attacked_this_round = False
     moved_this_round = False
     collected_this_round = False
+    type: str
 
     queued_moves: List[np.ndarray] = field(default_factory=deque)
     _group: 'Group' = field(default=None)  # This should only be modified from the relevant group object
+
+    def __hash__(self):
+        return self.id
+
+    def __eq__(self, other):
+        return self.id == other.id and self.__class__ == other.__class__
 
     def move(self, npos, new=True) -> None:
         """Move the unit to a new location. If its further than can be moved this turn, move as far as possible and queue the rest of the movement to happen later."""
@@ -48,19 +57,22 @@ class Unit:  # use dataclass?
                 raise RuntimeError(f"{self} attempted invalid move to or through impassable tile {self}")
 
         self.position = (self.position + diff).astype(int)
-        self.bot.send(dict(command='move', unit=self.id, destination=npos))
+        self.bot.send(dict(command='move', unit=self.id, destination=npos.tolist()))
 
     def proceed(self) -> None:
         """If the unit has queued moves, perform the first queued move."""
         if self.queued_moves:
             self.move(self.queued_moves.pop(), new=False)
 
+    def dist_to(self, other: 'Unit'):
+        return np.hypot(*(np.array(self.position) - np.array(other.position)))
+
     def units_within(self, dist: float, check: Optional[Callable[['Unit'], bool]] = None) -> List['Unit']:
         """Get a list of all units within the given distance of the unit.
         Optionally pass a check function and only return units which pass the check."""
         for unit in self.bot.units:
-            if unit != self and check(unit) if check else True:
-                if np.hypot(*(unit.position - self.position)) <= dist:
+            if ((unit != self) and check(unit)) if check else True:
+                if np.hypot(*(np.array(unit.position) - np.array(self.position))) <= dist:
                     yield unit
 
     def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:
@@ -72,22 +84,27 @@ class Unit:  # use dataclass?
                     yield group
 
     def attack_unit(self, target):
-        if np.linalg.norm(self.position, target.position) > self.attack_range:
+        if np.linalg.norm(np.array(self.position) - np.array(target.position)) > self.attack_range:
             raise RuntimeError(f"{self} attempted to hit out of his range!")
 
         if self.owner == target.owner:
             raise RuntimeError("Attempted to attack own unit!")
 
-        self.bot.send(command='attack', unit=self.id, target=target.id)
+        self.bot.send(dict(command='attack', unit=self.id, target=target.id))
 
     def nearest_nodes(self):
-        nodes = np.indices(self.bot.map)[self.bot.map[(self.bot.map == 3) | (self.bot.map == 4)]]
-        yield from sorted(nodes, key=lambda index: np.linalg.norm(self.position, index))
+        nodes = (
+            np.argwhere(
+                (self.bot.map == 3) | (self.bot.map == 4)
+            )
+        )
+        yield from sorted(nodes, key=lambda index: np.linalg.norm(self.position - index))
 
     def collect(self):
-        if not self.bot.map[self.position] in (3, 4):
+        if self.bot.map[tuple(self.position)] not in (3, 4):
             raise RuntimeError(f"{self} is not on a resource node!")
         self.bot.send(dict(command='collect', unit=self.id))
+
 
 class Gatherer(Unit):
     name = 'gatherer'
@@ -111,7 +128,7 @@ class StrongMelee(Unit):
     pass
 
 
-@dataclass(init=True, repr=True, eq=True)
+@dataclass(init=True, repr=True)
 class Group:
     """A group of units"""
     bot: 'Bot'
@@ -122,6 +139,13 @@ class Group:
     queued_moves: List[np.ndarray] = field(default_factory=list)
 
     members: List[Unit] = field(default_factory=list)
+
+    def __hash__(self):
+        print(self.id, hash(self.id), type(self.id))
+        return self.id
+
+    def __eq__(self, other):
+        return self.id == other.id and self.__class__ == other.__class__
 
     @property
     def size(self):
@@ -183,7 +207,7 @@ class Group:
         Optionally pass a check function and only return units which pass the check."""
         for unit in self.bot.units:
             if unit != self and check(unit) if check else True:
-                if np.hypot(*(unit.position - self.position)) <= dist:
+                if np.hypot(*(np.array(unit.position) - np.array(self.position))) <= dist:
                     yield unit
 
     def groups_within(self, dist: float, check: Optional[Callable[['Group'], bool]] = None) -> List['Group']:

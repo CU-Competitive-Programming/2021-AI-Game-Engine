@@ -1,5 +1,22 @@
 from typing import Union
 import numpy as np
+import json
+
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+
+def json_dumps(*args, **kwargs):
+    return json.dumps(*args, **kwargs, cls=NpEncoder)
+
 
 def raycast(start: Union[tuple[int, 2], np.ndarray], end: tuple[int, 2]) -> set[tuple]:
     """

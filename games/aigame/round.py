@@ -2,6 +2,8 @@ from collections import deque
 import numpy as np
 from .player import Player
 
+RESOURCE_TYPES = [None, None, None, "wood", "metal"]
+
 
 class GameRound(object):
 
@@ -44,13 +46,21 @@ class GameRound(object):
             unit.collected_this_round = False
 
         for etype in ["attack", "move", "collect", "spawn"]:
+            print("STARTING PART", etype)
             self.game.output['turns'][-1][etype] = self.game.get_state()
 
             for player in self.players:
                 player.send_part_start(round_number, etype)
 
-            Player.get_player_actions(self.players, etype)
+            Player.get_player_actions(self.players, etype, self.game.turn)
+
             self.dispatch_actions(etype)
+
+            if etype == "attack":
+                for unit in self.game.units[::]:
+                    if unit.health < 0:
+                        print("Killing unit", unit.owner.player_id, unit.type, unit.id)
+                        self.game.units.remove(unit)
 
             # if etype == "move":
             #     for unit in self.game.units:
@@ -65,9 +75,9 @@ class GameRound(object):
         if actor.attacked_this_round:
             raise RuntimeError(f"{actor} has already attacked this round!")
 
-        if np.linalg.norm(actor.position, target.position) > actor.attack_range:
+        if np.linalg.norm(np.array(actor.position) - np.array(target.position)) > actor.attack_range:
             raise RuntimeError(f"{actor} attempted to hit out of his range!")
-        target.health -= actor.damage
+        target.health -= actor.attack
         actor.attacked_this_round = True
 
     def dispatch_move(self, actor: 'units.Unit', pos: tuple[int, 2]):
@@ -90,14 +100,15 @@ class GameRound(object):
         if actor.collected_this_round:
             raise RuntimeError(f"{actor} has already collected this round!")
 
-        if self.game.map[tuple(actor.position)] in (3, 4):
+        tile = self.game.map[tuple(actor.position)]
+        if tile in (3, 4):
             actor.collected_this_round = True
-            actor.owner.balance['wood'] += 10 # TODO: Do some real math here
+            actor.owner.balance[RESOURCE_TYPES[tile]] += actor.collect_amount  # TODO: Do some real math here
         else:
             raise RuntimeError(f"{actor} attempted invalid collect tile {tuple(actor.position)}!")
 
     def dispatch_spawn(self, player, unit_type):
-        print(player, player.balance, self.game.costs[unit_type])
+        print(player, self.game.costs[unit_type])
         if unit_type not in self.game.costs:
             raise RuntimeError(f"{player} attempted to buy invalid unit {unit_type}")
 
@@ -109,8 +120,8 @@ class GameRound(object):
 
     def dispatch_actions(self, etype):
         for player in self.players:
-            newactions = deque()
-            for action in player.action_buffer.copy():
+            while player.action_buffer[self.game.turn][etype]:
+                action = player.action_buffer[self.game.turn][etype].popleft()
                 if action['command'] == etype:
                     if etype == 'attack':
                         attacker = self.game.get_unit(action['unit'], player)
@@ -127,7 +138,3 @@ class GameRound(object):
 
                     elif etype == "spawn":
                         self.dispatch_spawn(player, action['unit_type'])
-
-                else:
-                    newactions.append(action)
-            player.action_buffer = newactions
