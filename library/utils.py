@@ -41,7 +41,7 @@ def raycast(start: Union[tuple[int, 2], np.ndarray], end: tuple[int, 2]) -> set[
 
     tiles = set()
 
-    for n in range(ns, 0, -1):
+    for n in range(int(ns), 0, -1):
         tiles.add((x, y))
         if error > 0:
             x += x_inc

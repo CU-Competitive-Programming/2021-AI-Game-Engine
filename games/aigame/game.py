@@ -15,7 +15,7 @@ from .round import GameRound
 from .unit_costs import unit_costs, unit_stats
 from .utils import NpEncoder
 
-ROUND_COUNT = 50
+ROUND_COUNT = 20
 
 
 class AIGame(object):
@@ -44,6 +44,7 @@ class AIGame(object):
         self.server.bind(('localhost', 6667))
         self.server.listen(self.num_players)
 
+        corners = [(0, 0), ()]
         self.players = [Player(self, i, self.np_random, paths[i]) for i in range(self.num_players)]
         self.round = GameRound(self, self.players, self.np_random)
 
@@ -80,8 +81,10 @@ class AIGame(object):
         self.costs = unit_costs
         self.unit_stats = unit_stats
 
+        corners = [(0, 0), (len(self.map)-1, len(self.map)-1), (0, len(self.map)-1), (len(self.map)-1, 0)]
         # Initialize the map for each player
-        for player in self.players:
+        for player, home in zip(self.players, corners):
+            player.home = home
             player.send_init(self.map, self.num_players, self.costs)
             player.readthread.start()
             # player.errorthread.start()

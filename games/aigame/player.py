@@ -145,7 +145,8 @@ class Player(object):
             player_id=self.player_id,
             num_players=num_players,
             balance=self.balance,
-            costs=costs
+            costs=costs,
+            home=list(self.home)
         )
 
         # if self.sock.closed:

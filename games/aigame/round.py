@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, Counter
 import numpy as np
 from .player import Player
 
@@ -103,7 +103,9 @@ class GameRound(object):
         tile = self.game.map[tuple(actor.position)]
         if tile in (3, 4):
             actor.collected_this_round = True
-            actor.owner.balance[RESOURCE_TYPES[tile]] += actor.collect_amount  # TODO: Do some real math here
+            actor.owner.balance[RESOURCE_TYPES[tile]] += actor.collect_amount
+
+            print(f"Giving {actor.owner.player_id} {actor.collect_amount} {RESOURCE_TYPES[tile]} for unit {actor.id}")
         else:
             raise RuntimeError(f"{actor} attempted invalid collect tile {tuple(actor.position)}!")
 
@@ -115,7 +117,9 @@ class GameRound(object):
         if any(player.balance.get(cur, 0) < self.game.costs[unit_type][cur] for cur in self.game.costs[unit_type]):
             raise RuntimeError(f"{player} attempted to buy {unit_type} without enough money")
 
-        player.balance = {x: player.balance[x] - y for x, y in self.game.costs[unit_type].items()}
+        print(f"Taking {self.game.costs[unit_type]} from {player.player_id}")
+        player.balance = {x: player.balance[x] + y for x, y in self.game.costs[unit_type].items()}
+        # {x: player.balance[x] - y for x, y in self.game.costs[unit_type].items()}
         self.game.create_unit(player, unit_type)
 
     def dispatch_actions(self, etype):
