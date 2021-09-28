@@ -15,7 +15,7 @@ from .round import GameRound
 from .unit_costs import unit_costs, unit_stats
 from .utils import NpEncoder
 
-ROUND_COUNT = 20
+ROUND_COUNT = 50
 
 
 class AIGame(object):
@@ -65,7 +65,7 @@ class AIGame(object):
         print("PLAYER UNITS:", {player.player_id: len(player.units) for player in self.players})
         print(Counter(unit.type for unit in self.units))
         with open(f"output-{time.time()}.json", 'w') as outfile:
-            json.dump(self.output, outfile, indent=4, cls=NpEncoder)
+            json.dump(self.output, outfile, cls=NpEncoder)
         self.running = False
 
     def init_game(self):
@@ -96,6 +96,9 @@ class AIGame(object):
     def step(self, round_number: int):
         self.round.proceed_round(round_number)
 
+    def remove_unit(self, unit):
+        del self._units[unit.id]
+
     @property
     def units(self):
         return list(self._units.values())
@@ -125,9 +128,9 @@ class AIGame(object):
         return max(self.players, key=lambda p: sum(p.balance.values()))
 
     def get_unit(self, id: int, player: Player = None) -> 'units.Unit':
-        unit = self.units[id]
+        unit = self._units[id]
         if player and unit.owner != player:
-            raise RuntimeError(f"Attempted to control unit belonging to other player! {player}, {unit.owner}")
+            raise RuntimeError(f"Player {player.player_id} attempted to control unit belonging to other player! {unit.owner.player_id}'s {unit.id} {id}")
 
         return unit
 

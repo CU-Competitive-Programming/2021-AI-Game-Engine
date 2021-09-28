@@ -27,7 +27,6 @@ class AIBot(Bot):
 
     def on_move_start(self):
         self.log("move start!")
-        print({u.id: u.collect_amount for u, ass in self.gather_assignments.items()}, file=sys.stderr)
         for unit in self.myunits:
             if unit.collect_amount > 0:
                 # print(unit, self.gather_assignments, file=sys.stderr)

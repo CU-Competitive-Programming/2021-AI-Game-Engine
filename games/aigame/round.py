@@ -57,10 +57,14 @@ class GameRound(object):
             self.dispatch_actions(etype)
 
             if etype == "attack":
-                for unit in self.game.units[::]:
+                dead = []
+                for unit in self.game.units:
                     if unit.health < 0:
-                        print("Killing unit", unit.owner.player_id, unit.type, unit.id)
-                        self.game.units.remove(unit)
+                        dead.append(unit)
+
+                for unit in dead:
+                    print("Killing unit", unit.owner.player_id, unit.type, unit.id)
+                    self.game.remove_unit(unit)
 
             # if etype == "move":
             #     for unit in self.game.units:
@@ -72,6 +76,9 @@ class GameRound(object):
             #             group.proceed()
 
     def dispatch_attack(self, actor, target):
+        if actor.owner is target.owner:
+            raise RuntimeError(f"Can't attack own unit! (Player {actor.owner.player_id})")
+
         if actor.attacked_this_round:
             raise RuntimeError(f"{actor} has already attacked this round!")
 
@@ -133,6 +140,7 @@ class GameRound(object):
 
                         self.dispatch_attack(attacker, target)
                     elif etype == 'move':
+                        print("Received move", action)
                         actor = self.game.get_unit(action['unit'], player)
                         self.dispatch_move(actor, action['destination'])
 

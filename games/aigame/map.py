@@ -49,7 +49,7 @@ def generate_map(np_random):
     # persistence = .8
     # lacunarity = 5
 
-    shape = 15, 15
+    shape = 100, 100
     scale = 100.0
     octaves = 12
     persistence = 0.5

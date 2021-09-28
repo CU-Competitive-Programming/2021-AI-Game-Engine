@@ -1,1 +1,0 @@
-This folder should contain only code related to configuring gym environments.
