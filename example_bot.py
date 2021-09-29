@@ -8,6 +8,7 @@ from library import Bot
 
 RESOURCE_TYPES = [None, None, None, "wood", "metal"]
 
+
 class AIBot(Bot):
 
     def __init__(self, *args, **kwargs):
@@ -18,7 +19,8 @@ class AIBot(Bot):
         self.log("attack start!")
         for unit in self.myunits:
             if unit.attack_range > 0:
-                nearby = sorted(unit.units_within(unit.attack_range, lambda u: u.owner != self.player_id), key=unit.dist_to)
+                nearby = sorted(unit.units_within(unit.attack_range, lambda u: u.owner != self.player_id),
+                                key=unit.dist_to)
                 for enemy in nearby:
                     unit.attack_unit(enemy)
                     break
@@ -39,7 +41,8 @@ class AIBot(Bot):
                         unit.move(position)
                         break
             elif unit.attack > 0:
-                for enemy in sorted(self.enemyunits, key=lambda e: np.hypot(*(np.array(unit.position) - np.array(e.position)))):
+                for enemy in sorted(self.enemyunits,
+                                    key=lambda e: np.hypot(*(np.array(unit.position) - np.array(e.position)))):
                     unit.move(enemy.position)
                     break
 
@@ -66,6 +69,7 @@ class AIBot(Bot):
                 self.create_unit(utype)
 
         self.end_spawn()
+
 
 # try:
 #     aib = AIBot(logging_events=('in', 'out'))

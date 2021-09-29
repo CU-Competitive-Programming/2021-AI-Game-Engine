@@ -15,7 +15,7 @@ from .round import GameRound
 from .unit_costs import unit_costs, unit_stats
 from .utils import NpEncoder
 
-ROUND_COUNT = 50
+ROUND_COUNT = 200
 
 
 class AIGame(object):

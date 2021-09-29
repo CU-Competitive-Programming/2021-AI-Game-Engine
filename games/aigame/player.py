@@ -42,7 +42,7 @@ class Player(object):
         self.file_path = file_path
         self.action_buffer = defaultdict(lambda: defaultdict(deque))
         self.error_buffer = ""
-        self.balance = {'wood': 15, 'metal': 15}
+        self.balance = {'wood': 20, 'metal': 20}
         self.send_buffer = deque()
         self.home = 0, 0
 

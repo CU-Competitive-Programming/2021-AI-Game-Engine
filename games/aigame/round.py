@@ -1,4 +1,5 @@
-from collections import deque, Counter
+import copy
+from collections import deque, Counter, defaultdict
 import numpy as np
 from .player import Player
 
@@ -46,8 +47,8 @@ class GameRound(object):
             unit.collected_this_round = False
 
         for etype in ["attack", "move", "collect", "spawn"]:
-            print("STARTING PART", etype)
-            self.game.output['turns'][-1][etype] = self.game.get_state()
+            print("STARTING PART", round_number, etype, len(self.game.units))
+            self.game.output['turns'][-1][etype] = copy.deepcopy(self.game.get_state())
 
             for player in self.players:
                 player.send_part_start(round_number, etype)
@@ -59,7 +60,7 @@ class GameRound(object):
             if etype == "attack":
                 dead = []
                 for unit in self.game.units:
-                    if unit.health < 0:
+                    if unit.health <= 0:
                         dead.append(unit)
 
                 for unit in dead:
@@ -103,13 +104,16 @@ class GameRound(object):
         actor.move(pos)
         actor.moved_this_round = True
 
-    def dispatch_collect(self, actor):
+    def dispatch_collect(self, collections, actor):
         if actor.collected_this_round:
             raise RuntimeError(f"{actor} has already collected this round!")
 
+        if collections[tuple(actor.position)]:
+            raise RuntimeError(f"{actor.position} has already been collected this round!")
         tile = self.game.map[tuple(actor.position)]
-        if tile in (3, 4):
+        if tile in (3, 4):  # TODO: Make tiles only harvestable once per turn
             actor.collected_this_round = True
+            collections[tuple(actor.position)] = True
             actor.owner.balance[RESOURCE_TYPES[tile]] += actor.collect_amount
 
             print(f"Giving {actor.owner.player_id} {actor.collect_amount} {RESOURCE_TYPES[tile]} for unit {actor.id}")
@@ -125,12 +129,13 @@ class GameRound(object):
             raise RuntimeError(f"{player} attempted to buy {unit_type} without enough money")
 
         print(f"Taking {self.game.costs[unit_type]} from {player.player_id}")
-        player.balance = {x: player.balance[x] + y for x, y in self.game.costs[unit_type].items()}
+        player.balance = {x: player.balance[x] - y for x, y in self.game.costs[unit_type].items()}
         # {x: player.balance[x] - y for x, y in self.game.costs[unit_type].items()}
         self.game.create_unit(player, unit_type)
 
     def dispatch_actions(self, etype):
         for player in self.players:
+            collections = defaultdict(lambda: False)
             while player.action_buffer[self.game.turn][etype]:
                 action = player.action_buffer[self.game.turn][etype].popleft()
                 if action['command'] == etype:
@@ -146,7 +151,7 @@ class GameRound(object):
 
                     elif etype == 'collect':
                         actor = self.game.get_unit(action['unit'], player)
-                        self.dispatch_collect(actor)
+                        self.dispatch_collect(collections, actor)
 
                     elif etype == "spawn":
                         self.dispatch_spawn(player, action['unit_type'])

@@ -1,11 +1,11 @@
 unit_costs = {
     "gatherer": {
-        'wood': 5,
-        'metal': 5
+        'wood': 10,
+        'metal': 10
     },
     "attacker": {
-        'wood': 5,
-        'metal': 5
+        'wood': 10,
+        'metal': 10
     }
 }
 
@@ -21,8 +21,8 @@ unit_stats = {
     ),
     "attacker": dict(
         speed=10,
-        health=15,
-        attack=5,
+        health=10,
+        attack=10,
         defense=10,
         attack_range=15,
         view_range=None,

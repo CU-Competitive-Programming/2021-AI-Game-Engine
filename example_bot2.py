@@ -1,7 +1,7 @@
 import json
 import sys
 import traceback
-from collections import Counter
+from collections import Counter, defaultdict
 
 import numpy as np
 
@@ -15,10 +15,17 @@ class AIBot(Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.gather_assignments = {}
+        self.node_assignments = {}
+        self.enemy_assignments = defaultdict(list)
+        self.attack_assignments = {}
 
     def on_attack_start(self):
         self.log("attack start!")
         for unit in self.myunits:
+            if self.attack_assignments.get(unit.id) and \
+                    not self.enemy_assignments[self.attack_assignments.get(unit.id)]:
+                del self.attack_assignments[unit.id]
+
             if unit.attack_range > 0:
                 nearby = list(unit.units_within(unit.attack_range, lambda u: u.owner != self.player_id))
                 nearby.sort(key=lambda x: (unit.health <= 0, unit.dist_to(x), -x.collect_amount))
@@ -26,6 +33,8 @@ class AIBot(Bot):
                 # print(f"DISTANCES:", [(unit.dist_to(u), -u.collect_amount) for u in nearby], file=sys.stderr)
                 if nearby:
                     unit.attack_unit(nearby[0])
+                    if nearby[0].health <= 0 and self.enemy_assignments[nearby[0].id]:
+                        del self.enemy_assignments[nearby[0].id]
                     # print(f"1 ATTACKING UNIT: {nearby[0].collect_amount} {unit.dist_to(nearby[0])}", file=sys.stderr)
                 # for enemy in nearby:
                 #     print(f"1 ATTACKING UNIT: {unit.collect_amount} {unit.dist_to(enemy)}", file=sys.stderr)
@@ -40,20 +49,42 @@ class AIBot(Bot):
         for unit in self.myunits:
             if unit.collect_amount > 0:
                 # print(unit, self.gather_assignments, file=sys.stderr)
-                if unit not in self.gather_assignments:
-                    self.gather_assignments[unit] = min(self.balance, key=lambda x: self.balance[x])
+                if unit.id not in self.gather_assignments:
+                    self.gather_assignments[unit.id] = [min(self.balance, key=lambda x: sum(1 for res,_ in self.gather_assignments.values() if x == res)), None]
+
+                if self.gather_assignments[unit.id][1]:
+                    unit.move(self.gather_assignments[unit.id][1])
+                    continue
 
                 for position in unit.nearest_nodes():
                     # print(self.map[tuple(position)], file=sys.stderr)
-                    if self.map[tuple(position)] == RESOURCE_TYPES.index(self.gather_assignments[unit]):
+                    if tuple(position) not in self.node_assignments and \
+                            self.map[tuple(position)] == RESOURCE_TYPES.index(self.gather_assignments[unit.id][0]):
                         unit.move(position)
+                        self.node_assignments[tuple(position)] = unit.id
+                        self.gather_assignments[unit.id][1] = tuple(position)
                         break
             elif unit.attack > 0:
-                for enemy in sorted(self.enemyunits, key=lambda e: (
-                        -e.collect_amount, np.hypot(*(np.array(unit.position) - np.array(e.position))))):
-                    # print(f"MOVING TOWARD {enemy.collect_amount} DIST {unit.dist_to(enemy)}", file=sys.stderr)
-                    unit.move(enemy.position)
-                    break
+                target = self.attack_assignments.get(unit.id)
+                if target and target not in self._units:
+                    del self.attack_assignments[unit.id]
+                    target = None
+
+                if target:
+                    print('t', self._units[target].position, file=sys.stderr)
+                    unit.move(self._units[target].position)
+                else:
+                    for enemy in sorted(self.enemyunits, key=lambda e: (
+                            -e.collect_amount, np.hypot(*(np.array(unit.position) - np.array(e.position))))):
+                        # print(f"MOVING TOWARD {enemy.collect_amount} DIST {unit.dist_to(enemy)}", file=sys.stderr)
+                        if len(self.enemy_assignments[enemy.id]) == 3:
+                            continue
+                        else:
+                            self.enemy_assignments[enemy.id].append(unit.id)
+                            self.attack_assignments[unit.id] = enemy.id
+
+                        unit.move(enemy.position)
+                        break
 
         self.end_move()
 
@@ -62,17 +93,22 @@ class AIBot(Bot):
         for unit in self.myunits:
             if unit.collect_amount > 0:
                 if self.map[tuple(unit.position)] in (3, 4):
+                    print(f"Collecting unit {unit.id}", file=sys.stderr)
                     unit.collect()
 
         self.end_collect()
 
     def on_spawn_start(self):
+        if self.turn == 0:
+            self.create_unit('gatherer')
+            self.create_unit('gatherer')
+
         # self.log("spawn start!")
         # self.log(self.costs)
 
         # print(self.balance, file=sys.stderr)
 
-        ratio = {"gatherer": 1, "attacker": 1}
+        ratio = {"gatherer": 1, "attacker": 2}
 
         counts = Counter(u.type for u in self.myunits)
 
@@ -80,10 +116,16 @@ class AIBot(Bot):
                 any(ratio[x] / sum(ratio.values()) > counts[x] / sum(counts.values()) for x in counts) or \
                 (sum(counts.values()) < 100) or \
                 (len(self.myunits) < 2 * len(self.enemyunits)):
-            utype = min(
-                ratio,
-                key=lambda x: ratio[x] / (sum(ratio.values())) <= counts[x] / (sum(counts.values()) or 1)
-            )
+            if counts['gatherer'] >= len(np.argwhere((self.map == 3) | (self.map == 4))):
+                utype = min(
+                    {'attacker': 3},
+                    key=lambda x: ratio[x] / (sum(ratio.values())) <= counts[x] / (sum(counts.values()) or 1)
+                )
+            else:
+                utype = min(
+                    ratio,
+                    key=lambda x: ratio[x] / (sum(ratio.values())) <= counts[x] / (sum(counts.values()) or 1)
+                )
 
             if (len(self.myunits) >= 2 * len(self.enemyunits)) and (sum(counts.values()) >= 100):
                 break
