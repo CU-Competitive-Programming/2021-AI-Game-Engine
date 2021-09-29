@@ -1,12 +1,14 @@
 import json
 import sys
 import traceback
+from collections import Counter
 
 import numpy as np
 
 from library import Bot
 
 RESOURCE_TYPES = [None, None, None, "wood", "metal"]
+
 
 class AIBot(Bot):
 
@@ -19,7 +21,7 @@ class AIBot(Bot):
         for unit in self.myunits:
             if unit.attack_range > 0:
                 nearby = list(unit.units_within(unit.attack_range, lambda u: u.owner != self.player_id))
-                nearby.sort(key=lambda x: (unit.dist_to(x), -x.collect_amount))
+                nearby.sort(key=lambda x: (unit.health <= 0, unit.dist_to(x), -x.collect_amount))
 
                 # print(f"DISTANCES:", [(unit.dist_to(u), -u.collect_amount) for u in nearby], file=sys.stderr)
                 if nearby:
@@ -47,7 +49,8 @@ class AIBot(Bot):
                         unit.move(position)
                         break
             elif unit.attack > 0:
-                for enemy in sorted(self.enemyunits, key=lambda e: (-e.collect_amount, np.hypot(*(np.array(unit.position) - np.array(e.position))))):
+                for enemy in sorted(self.enemyunits, key=lambda e: (
+                        -e.collect_amount, np.hypot(*(np.array(unit.position) - np.array(e.position))))):
                     # print(f"MOVING TOWARD {enemy.collect_amount} DIST {unit.dist_to(enemy)}", file=sys.stderr)
                     unit.move(enemy.position)
                     break
@@ -69,20 +72,31 @@ class AIBot(Bot):
 
         # print(self.balance, file=sys.stderr)
 
-        if len(self.myunits) >= 2 * len(self.enemyunits):
-            self.end_spawn()
-            return
+        ratio = {"gatherer": 1, "attacker": 1}
 
-        bought = True
-        while bought:
-            bought = False
-            for utype, cost in self.costs.items():
-                if all(self.balance[x] - y >= 0 for x, y in cost.items()):
-                    # print(f"Spawning unit {utype}", file=sys.stderr)
-                    self.create_unit(utype)
-                    bought = True
+        counts = Counter(u.type for u in self.myunits)
+
+        while (not self.myunits) or \
+                any(ratio[x] / sum(ratio.values()) > counts[x] / sum(counts.values()) for x in counts) or \
+                (sum(counts.values()) < 100) or \
+                (len(self.myunits) < 2 * len(self.enemyunits)):
+            utype = min(
+                ratio,
+                key=lambda x: ratio[x] / (sum(ratio.values())) <= counts[x] / (sum(counts.values()) or 1)
+            )
+
+            if (len(self.myunits) >= 2 * len(self.enemyunits)) and (sum(counts.values()) >= 100):
+                break
+
+            if all(self.balance[x] - y >= 0 for x, y in self.costs[utype].items()):
+                # print(f"Spawning unit {utype}", file=sys.stderr)
+                self.create_unit(utype)
+                counts[utype] += 1
+            else:
+                break
 
         self.end_spawn()
+
 
 # try:
 #     aib = AIBot(logging_events=('in', 'out'))

@@ -64,6 +64,8 @@ class AIGame(object):
         print("UNITS:", len(self.units))
         print("PLAYER UNITS:", {player.player_id: len(player.units) for player in self.players})
         print(Counter(unit.type for unit in self.units))
+        print('p0 units', Counter(unit.type for unit in self.players[0].units))
+        print('p1 units', Counter(unit.type for unit in self.players[1].units))
         with open(f"output-{time.time()}.json", 'w') as outfile:
             json.dump(self.output, outfile, cls=NpEncoder)
         self.running = False

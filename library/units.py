@@ -90,6 +90,7 @@ class Unit:  # use dataclass?
         if self.owner == target.owner:
             raise RuntimeError("Attempted to attack own unit!")
 
+        target.health -= self.attack
         self.bot.send(dict(command='attack', unit=self.id, target=target.id))
 
     def nearest_nodes(self):

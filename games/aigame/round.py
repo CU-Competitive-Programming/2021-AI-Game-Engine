@@ -139,8 +139,8 @@ class GameRound(object):
                         target = self.game.get_unit(action['target'])
 
                         self.dispatch_attack(attacker, target)
+
                     elif etype == 'move':
-                        print("Received move", action)
                         actor = self.game.get_unit(action['unit'], player)
                         self.dispatch_move(actor, action['destination'])
 
