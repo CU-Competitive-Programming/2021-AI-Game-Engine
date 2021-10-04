@@ -41,6 +41,10 @@ class GameRound(object):
 
         self.game.output['turns'].append({})
 
+        for player in self.players:
+            for item in player.balance:
+                player.balance[item] = player.balance[item] + 1
+
         for unit in self.game.units:
             unit.attacked_this_round = False
             unit.moved_this_round = False

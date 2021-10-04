@@ -1,4 +1,5 @@
 import json
+import random
 import sys
 import traceback
 from collections import Counter, defaultdict
@@ -98,6 +99,8 @@ class AIBot(Bot):
 
         self.end_collect()
 
+
+    ratio = {"gatherer": random.randint(1,3), "attacker": random.randint(1,3)}
     def on_spawn_start(self):
         if self.turn == 0:
             self.create_unit('gatherer')
@@ -107,8 +110,7 @@ class AIBot(Bot):
         # self.log(self.costs)
 
         # print(self.balance, file=sys.stderr)
-
-        ratio = {"gatherer": 1, "attacker": 2}
+        ratio = self.ratio
 
         counts = Counter(u.type for u in self.myunits)
 
@@ -116,9 +118,9 @@ class AIBot(Bot):
                 any(ratio[x] / sum(ratio.values()) > counts[x] / sum(counts.values()) for x in counts) or \
                 (sum(counts.values()) < 100) or \
                 (len(self.myunits) < 2 * len(self.enemyunits)):
-            if counts['gatherer'] >= len(np.argwhere((self.map == 3) | (self.map == 4))):
+            if self.myunits and counts['gatherer'] >= len(list(self.myunits[0].nearest_nodes())):
                 utype = min(
-                    {'attacker': 3},
+                    {'attacker': 1},
                     key=lambda x: ratio[x] / (sum(ratio.values())) <= counts[x] / (sum(counts.values()) or 1)
                 )
             else:
@@ -130,7 +132,7 @@ class AIBot(Bot):
             if (len(self.myunits) >= 2 * len(self.enemyunits)) and (sum(counts.values()) >= 100):
                 break
 
-            if all(self.balance[x] - y >= 0 for x, y in self.costs[utype].items()):
+            if all(self.balance[x] >= y for x, y in self.costs[utype].items()):
                 # print(f"Spawning unit {utype}", file=sys.stderr)
                 self.create_unit(utype)
                 counts[utype] += 1
