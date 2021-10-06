@@ -11,27 +11,32 @@ import numpy as np
 
 
 class Brain:
-    def __init__(self, h1, o, h2=0, h3=0):
-        # hidden layer setup, +1 for bias layer ~~ shape(1 + len(data), h1)
-        self.hlayer1 = np.array([np.random.rand(h1)
-                                for i in range(len(data) + 1)])
+    def __init__(self, il, h1, o, h2=0, h3=0):
+        self.last = h1
+        # hidden layer setup, +1 for bias layer ~~ shape(len(il), h1 + 1)
+        self.hlayer1 = np.array([(2 * np.random.rand(h1 + 1) - 1)
+                                for i in range(il)])
 
         # starting the big network fun by putting all the layers into one big array
-        self.network = np.array(self.hlayer1)
+        self.network = [self.hlayer1]
 
         if h2 > 0:
-            # ~~ shape(1 + h1, h2)
-            self.hlayer2 = np.array([np.random.rand(h2)
-                                    for i in range(h1 + 1)])
-            np.append(self.network, self.hlayer2)
+            # ~~ shape(h1, h2 + 1)
+            self.hlayer2 = np.array([(2 * np.random.rand(h2 + 1) - 1)
+                                    for i in range(h1)])
+            self.network.append(self.hlayer2)
+            self.last = h2
         if h3 > 0:
-            # ~~ shape(1 + h2, h3)
-            self.hlayer3 = np.array([np.random.rand(h3)
-                                    for i in range(h2 + 1)])
-            np.append(self.network, self.hlayer3)
+            # ~~ shape(h2, h3 + 1)
+            self.hlayer3 = np.array([(2 * np.random.rand(h3 + 1) - 1)
+                                    for i in range(h2)])
+            self.network.append(self.hlayer3)
+            self.last = h3
 
-        self.output = np.zeros(o)  # output layer ~~ shape(o, )
-        np.append(self.network, self.output)
+        self.output = np.array([(2 * np.random.rand(self.last + 1) - 1)
+                                for i in range(o)])  # output layer ~~ shape(o, self.last + 1)
+        self.network.append(self.output)
+        # print(self.network)
 
     def sigmoid(self, num):  # sigmoid function to make values in hidden layers between 0 and 1
         return 1.0 / (1.0 + math.exp(-num))
@@ -44,8 +49,16 @@ class Brain:
         for layer in self.network:
             ninputs = []  # new inputs for next layer
             for node in layer:
-                activated = node  # TODO: do activation
+                # get the value from the activation function
+                activated = self.activate(node, inputs)
                 sig = self.sigmoid(activated)  # sigmoid these hoes
                 ninputs.append(sig)  # add to new inputs
             inputs = ninputs
         return inputs.index(np.max(inputs))
+
+    def activate(self, weights, inputs):
+        activation = weights[-1]  # the last number is reserved for the bias
+        for i in range(len(weights) - 1):
+            # multiplying all the weights to the inputs
+            activation += weights[i] * inputs[i]
+        return activation

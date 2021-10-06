@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 import numpy as np
 
 from library import Bot
+from brain import Brain
 
 RESOURCE_TYPES = [None, None, None, "wood", "metal"]
 
@@ -19,6 +20,12 @@ class AIBot(Bot):
         self.node_assignments = {}
         self.enemy_assignments = defaultdict(list)
         self.attack_assignments = {}
+        self.spawnerB1 = Brain(8, 4, 2)
+        self.spawnerB2 = Brain(8, 4, 2)
+        self.prevwood = 0
+        self.prevmetal = 0
+
+#############################################################################################################
 
     def on_attack_start(self):
         self.log("attack start!")
@@ -45,6 +52,8 @@ class AIBot(Bot):
                 #     break
 
         self.end_attack()
+
+#############################################################################################################
 
     def on_move_start(self):
         self.log("move start!")
@@ -92,6 +101,8 @@ class AIBot(Bot):
 
         self.end_move()
 
+#############################################################################################################
+
     def on_collect_start(self):
         self.log("collect start!", len(self.units))
         for unit in self.myunits:
@@ -102,57 +113,53 @@ class AIBot(Bot):
 
         self.end_collect()
 
-    ratio = {"gatherer": random.randint(
-        1, 3), "attacker": random.randint(1, 3)}
+#############################################################################################################
 
     def on_spawn_start(self):
+        # temporary buffer on first turn to make sure bot doesnt die immediately
         if self.turn == 0:
             self.create_unit('gatherer')
-            self.create_unit('gatherer')
+        # makes sure it can buy units before doing the hard thinking
+        elif self.balance['wood'] >= 10 and self.balance['metal'] >= 10:
+            # counting upo the types of units
+            counts = Counter(u.type for u in self.myunits)
+            stop = False
+            # this is the buying loop to decide if the net wants to buy another unit
+            while not stop and self.balance['wood'] >= 10 and self.balance['metal'] >= 10:
+                # big data array to feed into the brain ~~ length: 8
+                data = [counts['gatherer'], counts['attacker'], self.balance['wood'], self.balance['metal'],
+                        self.player_balances[str(int(not self.player_id))]['wood'], self.player_balances[str(
+                            int(not self.player_id))]['metal'],
+                        self.balance['wood'] - self.prevwood, self.balance['metal'] - self.prevmetal]
 
-        # self.log("spawn start!")
-        # self.log(self.costs)
+                # first decision: buy unit? 1-yes 0-no
+                c1 = self.spawnerB1.generateOutput(data)
 
-        # print(self.balance, file=sys.stderr)
-        ratio = self.ratio
+                if c1 == 0:
+                    stop = True  # if no, stop buying
+                    break
+                else:
+                    # second decision: which unit? 1-attacker 0-gatherer
+                    c2 = self.spawnerB2.generateOutput(data)
+                    if c2 == 0:
+                        # code i stole from henry, i think it checks if the unit can be bought or not
+                        if all(self.balance[x] >= y for x, y in self.costs['gatherer'].items()):
+                            self.create_unit('gatherer')  # makes the unit
+                            # updates count for next run of loop
+                            counts['gatherer'] += 1
+                    elif c2 == 1:
+                        # same deal here but with attackers
+                        if all(self.balance[x] >= y for x, y in self.costs['attacker'].items()):
+                            self.create_unit('attacker')
+                            counts['attacker'] += 1
 
-        counts = Counter(u.type for u in self.myunits)
-
-        while (not self.myunits) or \
-                any(ratio[x] / sum(ratio.values()) > counts[x] / sum(counts.values()) for x in counts) or \
-                (sum(counts.values()) < 100) or \
-                (len(self.myunits) < 2 * len(self.enemyunits)):
-            if self.myunits and counts['gatherer'] >= len(list(self.myunits[0].nearest_nodes())):
-                utype = min(
-                    {'attacker': 1},
-                    key=lambda x: ratio[x] / (sum(ratio.values())
-                                              ) <= counts[x] / (sum(counts.values()) or 1)
-                )
-            else:
-                utype = min(
-                    ratio,
-                    key=lambda x: ratio[x] / (sum(ratio.values())
-                                              ) <= counts[x] / (sum(counts.values()) or 1)
-                )
-
-            if (len(self.myunits) >= 2 * len(self.enemyunits)) and (sum(counts.values()) >= 100):
-                break
-
-            if all(self.balance[x] >= y for x, y in self.costs[utype].items()):
-                # print(f"Spawning unit {utype}", file=sys.stderr)
-                self.create_unit(utype)
-                counts[utype] += 1
-            else:
-                break
-
+        # saving the amount of resources to be able to calculate change per round
+        self.prevmetal = self.balance['metal']
+        self.prevwood = self.balance['wood']
         self.end_spawn()
 
+#############################################################################################################
 
-# try:
-#     aib = AIBot(logging_events=('in', 'out'))
-#     aib.run()
-# except Exception as e:
-#     open(f'asdasd-{aib.player_id}.out', 'w').write(str(e))
 
 try:
     bot = AIBot(logging_events=('in', 'out'))
