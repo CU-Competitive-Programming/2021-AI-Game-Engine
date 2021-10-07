@@ -62,3 +62,12 @@ class Brain:
             # multiplying all the weights to the inputs
             activation += weights[i] * inputs[i]
         return activation
+
+    def mutate(self, per):
+        # changing the weights and biases by a random percentage, used for making more brains
+        for layer in self.network:
+            for i in range(len(layer)):
+                for j in range(len(layer[i])):
+                    r = np.random.rand()
+                    if r < per:
+                        layer[i][j] = 2 * np.random.rand() - 1

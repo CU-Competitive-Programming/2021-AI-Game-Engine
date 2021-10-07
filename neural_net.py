@@ -117,10 +117,12 @@ class AIBot(Bot):
 
     def on_spawn_start(self):
         # temporary buffer on first turn to make sure bot doesnt die immediately
+        points = 1  # reinforcement learning points, temp values
         if self.turn == 0:
             self.create_unit('gatherer')
         # makes sure it can buy units before doing the hard thinking
         elif self.balance['wood'] >= 10 and self.balance['metal'] >= 10:
+            points += 1
             # counting upo the types of units
             counts = Counter(u.type for u in self.myunits)
             stop = False
@@ -140,19 +142,25 @@ class AIBot(Bot):
                     break
                 else:
                     # second decision: which unit? 1-attacker 0-gatherer
+                    points += 1
                     c2 = self.spawnerB2.generateOutput(data)
                     if c2 == 0:
                         # code i stole from henry, i think it checks if the unit can be bought or not
                         if all(self.balance[x] >= y for x, y in self.costs['gatherer'].items()):
+                            points += 2
                             self.create_unit('gatherer')  # makes the unit
                             # updates count for next run of loop
                             counts['gatherer'] += 1
                     elif c2 == 1:
                         # same deal here but with attackers
                         if all(self.balance[x] >= y for x, y in self.costs['attacker'].items()):
+                            points += 2
                             self.create_unit('attacker')
                             counts['attacker'] += 1
 
+        # temp mutate for now
+        self.spawnerB1.mutate(1/(2 * points))
+        self.spawnerB2.mutate(1/(2 * points))
         # saving the amount of resources to be able to calculate change per round
         self.prevmetal = self.balance['metal']
         self.prevwood = self.balance['wood']
