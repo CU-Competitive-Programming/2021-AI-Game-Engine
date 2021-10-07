@@ -159,8 +159,8 @@ class AIBot(Bot):
                             counts['attacker'] += 1
 
         # temp mutate for now
-        self.spawnerB1.mutate(1/(2 * points))
-        self.spawnerB2.mutate(1/(2 * points))
+        self.spawnerB1.mutate(1/(points**2))
+        self.spawnerB2.mutate(1/(points**2))
         # saving the amount of resources to be able to calculate change per round
         self.prevmetal = self.balance['metal']
         self.prevwood = self.balance['wood']

@@ -71,3 +71,13 @@ class Brain:
                     r = np.random.rand()
                     if r < per:
                         layer[i][j] = 2 * np.random.rand() - 1
+
+    def saveToFile(self, name):
+        # save the whole brain to a file to get it back in future games
+        file = "./savedbrains/" + name
+        np.save(file, self.network)
+
+    def loadFromFile(self, name):
+        # load saved brain from file
+        file = "./savedbrains/" + name + ".npy"
+        self.network = np.load(file, allow_pickle=True)
