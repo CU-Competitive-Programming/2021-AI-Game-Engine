@@ -1,83 +1,49 @@
-import json
-import os
-import sys
-import time
-import socket
 import math
-
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
+from torchvision import datasets
+import torch.optim as optim
+import torch.nn.functional as F
+import torchvision.transforms as T
 import numpy as np
+from collections import namedtuple, deque
+import random
 
 # this is my first attempt at making a neural net so im going to try and comment for my sake
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print("Using {} device".format(device))
+
+# https://www.analyticsvidhya.com/blog/2019/04/introduction-deep-q-learning-python/
+# https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
+# https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html
+# https://github.com/nevenp/dqn_flappy_bird/blob/master/dqn.py
+# Alright, time for the rewrite
+# This is going to be the structure for a multi-agent deep q learning neural net
+# Now that is a mouthful but it just means that each agent type shares a brain
+# And the brain learns off of every agent in the field simutaniously
+# I might have to change this because of speed, but that will be minor
 
 
-class Brain:
-    def __init__(self, il, h1, o, h2=0, h3=0):
-        self.last = h1
-        # hidden layer setup, +1 for bias layer ~~ shape(len(il), h1 + 1)
-        self.hlayer1 = np.array([(2 * np.random.rand(h1 + 1) - 1)
-                                for i in range(il)])
+class Brain(nn.Module):
+    def __init__(self):
+        super(Brain, self).__init__()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(10, 6),
+            nn.ReLU(),
+            nn.Linear(6, 6),
+            nn.ReLU(),
+            nn.Linear(6, 2)
+        )
 
-        # starting the big network fun by putting all the layers into one big array
-        self.network = [self.hlayer1]
+    def forward(self, x):
+        logits = self.linear_relu_stack(x)
+        return logits
 
-        if h2 > 0:
-            # ~~ shape(h1, h2 + 1)
-            self.hlayer2 = np.array([(2 * np.random.rand(h2 + 1) - 1)
-                                    for i in range(h1)])
-            self.network.append(self.hlayer2)
-            self.last = h2
-        if h3 > 0:
-            # ~~ shape(h2, h3 + 1)
-            self.hlayer3 = np.array([(2 * np.random.rand(h3 + 1) - 1)
-                                    for i in range(h2)])
-            self.network.append(self.hlayer3)
-            self.last = h3
 
-        self.output = np.array([(2 * np.random.rand(self.last + 1) - 1)
-                                for i in range(o)])  # output layer ~~ shape(o, self.last + 1)
-        self.network.append(self.output)
-        # print(self.network)
-
-    def sigmoid(self, num):  # sigmoid function to make values in hidden layers between 0 and 1
-        return 1.0 / (1.0 + math.exp(-num))
-
-    # this is the big function that does the whole learning process and returns the max value of the output array
-    # https://machinelearningmastery.com/implement-backpropagation-algorithm-scratch-python/
-    def generateOutput(self, ndata):
-        # updating what the network learns on every turn since it isnt always going to be the same
-        inputs = ndata
-        for layer in self.network:
-            ninputs = []  # new inputs for next layer
-            for node in layer:
-                # get the value from the activation function
-                activated = self.activate(node, inputs)
-                sig = self.sigmoid(activated)  # sigmoid these hoes
-                ninputs.append(sig)  # add to new inputs
-            inputs = ninputs
-        return inputs.index(np.max(inputs))
-
-    def activate(self, weights, inputs):
-        activation = weights[-1]  # the last number is reserved for the bias
-        for i in range(len(weights) - 1):
-            # multiplying all the weights to the inputs
-            activation += weights[i] * inputs[i]
-        return activation
-
-    def mutate(self, per):
-        # changing the weights and biases by a random percentage, used for making more brains
-        for layer in self.network:
-            for i in range(len(layer)):
-                for j in range(len(layer[i])):
-                    r = np.random.rand()
-                    if r < per:
-                        layer[i][j] = 2 * np.random.rand() - 1
-
-    def saveToFile(self, name):
-        # save the whole brain to a file to get it back in future games
-        file = "./savedbrains/" + name
-        np.save(file, self.network)
-
-    def loadFromFile(self, name):
-        # load saved brain from file
-        file = "./savedbrains/" + name + ".npy"
-        self.network = np.load(file, allow_pickle=True)
+b = Brain().to(device)
+X = torch.rand(1, 10, device=device)
+logits = b(X)
+pred_probab = nn.Softmax(dim=1)(logits)
+y_pred = pred_probab.argmax(1)
+print(f"Predicted class: {y_pred[0]}")
