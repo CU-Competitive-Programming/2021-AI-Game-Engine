@@ -119,6 +119,8 @@ class AIBot(Bot):
         # temporary buffer on first turn to make sure bot doesnt die immediately
         points = 1  # reinforcement learning points, temp values
         if self.turn == 0:
+            self.spawnerB1.loadFromFile("1SB1")
+            self.spawnerB2.loadFromFile("1SB2")
             self.create_unit('gatherer')
         # makes sure it can buy units before doing the hard thinking
         elif self.balance['wood'] >= 10 and self.balance['metal'] >= 10:
@@ -133,7 +135,7 @@ class AIBot(Bot):
                         self.player_balances[str(int(not self.player_id))]['wood'], self.player_balances[str(
                             int(not self.player_id))]['metal'],
                         self.balance['wood'] - self.prevwood, self.balance['metal'] - self.prevmetal]
-
+                print("Penis" + str(data), file=sys.stderr)
                 # first decision: buy unit? 1-yes 0-no
                 c1 = self.spawnerB1.generateOutput(data)
 
@@ -147,23 +149,26 @@ class AIBot(Bot):
                     if c2 == 0:
                         # code i stole from henry, i think it checks if the unit can be bought or not
                         if all(self.balance[x] >= y for x, y in self.costs['gatherer'].items()):
-                            points += 2
+                            points += 3
                             self.create_unit('gatherer')  # makes the unit
                             # updates count for next run of loop
                             counts['gatherer'] += 1
                     elif c2 == 1:
                         # same deal here but with attackers
                         if all(self.balance[x] >= y for x, y in self.costs['attacker'].items()):
-                            points += 2
+                            points += 3
                             self.create_unit('attacker')
                             counts['attacker'] += 1
 
-        # temp mutate for now
-        self.spawnerB1.mutate(1/(points**2))
-        self.spawnerB2.mutate(1/(points**2))
+            # temp mutate for now
+            self.spawnerB1.mutate(1/(points**3))
+            self.spawnerB2.mutate(1/(points**3))
         # saving the amount of resources to be able to calculate change per round
         self.prevmetal = self.balance['metal']
         self.prevwood = self.balance['wood']
+        if self.turn == 199:
+            self.spawnerB1.saveToFile("1SB1")
+            self.spawnerB2.saveToFile("1SB2")
         self.end_spawn()
 
 #############################################################################################################
