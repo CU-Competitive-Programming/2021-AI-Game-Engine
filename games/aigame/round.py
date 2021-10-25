@@ -113,7 +113,8 @@ class GameRound(object):
             raise RuntimeError(f"{actor} has already collected this round!")
 
         if collections[tuple(actor.position)]:
-            raise RuntimeError(f"{actor.position} has already been collected this round!")
+            return
+            # raise RuntimeError(f"{actor.position} has already been collected this round!")
         tile = self.game.map[tuple(actor.position)]
         if tile in (3, 4):  # TODO: Make tiles only harvestable once per turn
             actor.collected_this_round = True
