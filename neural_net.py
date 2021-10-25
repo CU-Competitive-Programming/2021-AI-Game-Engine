@@ -119,8 +119,8 @@ class AIBot(Bot):
         # temporary buffer on first turn to make sure bot doesnt die immediately
         points = 1  # reinforcement learning points, temp values
         if self.turn == 0:
-            self.spawnerB1.loadFromFile("1SB1")
-            self.spawnerB2.loadFromFile("1SB2")
+            # self.spawnerB1.loadFromFile("1SB1")
+            # self.spawnerB2.loadFromFile("1SB2")
             self.create_unit('gatherer')
         # makes sure it can buy units before doing the hard thinking
         elif self.balance['wood'] >= 10 and self.balance['metal'] >= 10:
@@ -161,14 +161,14 @@ class AIBot(Bot):
                             counts['attacker'] += 1
 
             # temp mutate for now
-            self.spawnerB1.mutate(1/(points**3))
-            self.spawnerB2.mutate(1/(points**3))
+            # self.spawnerB1.mutate(1/(points**3))
+            # self.spawnerB2.mutate(1/(points**3))
         # saving the amount of resources to be able to calculate change per round
         self.prevmetal = self.balance['metal']
         self.prevwood = self.balance['wood']
-        if self.turn == 199:
-            self.spawnerB1.saveToFile("1SB1")
-            self.spawnerB2.saveToFile("1SB2")
+        # if self.turn == 199:
+        # self.spawnerB1.saveToFile("1SB1")
+        # self.spawnerB2.saveToFile("1SB2")
         self.end_spawn()
 
 #############################################################################################################

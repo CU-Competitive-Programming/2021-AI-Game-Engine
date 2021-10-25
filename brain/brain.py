@@ -1,6 +1,7 @@
 import math
 import torch
 from torch import nn
+#from torch._C import float64, int64
 from torch.utils.data import DataLoader
 from torchvision import datasets
 import torch.optim as optim
@@ -11,8 +12,7 @@ from collections import namedtuple, deque
 import random
 
 # this is my first attempt at making a neural net so im going to try and comment for my sake
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print("Using {} device".format(device))
+
 
 # https://www.analyticsvidhya.com/blog/2019/04/introduction-deep-q-learning-python/
 # https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
@@ -25,15 +25,15 @@ print("Using {} device".format(device))
 # I might have to change this because of speed, but that will be minor
 
 
-class Brain(nn.Module):
-    def __init__(self):
-        super(Brain, self).__init__()
+class NN(nn.Module):
+    def __init__(self, i, h, o):
+        super(NN, self).__init__()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(10, 6),
+            nn.Linear(i, h),
             nn.ReLU(),
-            nn.Linear(6, 6),
+            nn.Linear(h, h),
             nn.ReLU(),
-            nn.Linear(6, 2)
+            nn.Linear(h, o)
         )
 
     def forward(self, x):
@@ -41,9 +41,14 @@ class Brain(nn.Module):
         return logits
 
 
-b = Brain().to(device)
-X = torch.rand(1, 10, device=device)
-logits = b(X)
-pred_probab = nn.Softmax(dim=1)(logits)
-y_pred = pred_probab.argmax(1)
-print(f"Predicted class: {y_pred[0]}")
+class Brain:
+    def __init__(self, i, h, o):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.net = NN(i, h, o).to(self.device)
+
+    def generateOutput(self, data):
+        d = torch.tensor(np.array(data, dtype=np.float32))
+        logits = self.net(d)
+        pred_probab = nn.Softmax(dim=0)(logits)
+        y_pred = pred_probab.argmax(0)
+        return y_pred.item()
