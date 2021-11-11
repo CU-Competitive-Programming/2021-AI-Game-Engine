@@ -28,8 +28,10 @@ class AIBot(Bot):
                 del self.attack_assignments[unit.id]
 
             if unit.attack_range > 0:
-                nearby = list(unit.units_within(unit.attack_range, lambda u: u.owner != self.player_id))
-                nearby.sort(key=lambda x: (unit.health <= 0, unit.dist_to(x), -x.collect_amount))
+                nearby = list(unit.units_within(unit.attack_range,
+                              lambda u: u.owner != self.player_id))
+                nearby.sort(key=lambda x: (unit.health <= 0,
+                            unit.dist_to(x), -x.collect_amount))
 
                 # print(f"DISTANCES:", [(unit.dist_to(u), -u.collect_amount) for u in nearby], file=sys.stderr)
                 if nearby:
@@ -51,7 +53,8 @@ class AIBot(Bot):
             if unit.collect_amount > 0:
                 # print(unit, self.gather_assignments, file=sys.stderr)
                 if unit.id not in self.gather_assignments:
-                    self.gather_assignments[unit.id] = [min(self.balance, key=lambda x: sum(1 for res,_ in self.gather_assignments.values() if x == res)), None]
+                    self.gather_assignments[unit.id] = [min(self.balance, key=lambda x: sum(
+                        1 for res, _ in self.gather_assignments.values() if x == res)), None]
 
                 if self.gather_assignments[unit.id][1]:
                     unit.move(self.gather_assignments[unit.id][1])
@@ -99,8 +102,9 @@ class AIBot(Bot):
 
         self.end_collect()
 
+    ratio = {"gatherer": random.randint(
+        1, 3), "attacker": random.randint(1, 3)}
 
-    ratio = {"gatherer": random.randint(1,3), "attacker": random.randint(1,3)}
     def on_spawn_start(self):
         if self.turn == 0:
             self.create_unit('gatherer')
@@ -121,12 +125,14 @@ class AIBot(Bot):
             if self.myunits and counts['gatherer'] >= len(list(self.myunits[0].nearest_nodes())):
                 utype = min(
                     {'attacker': 1},
-                    key=lambda x: ratio[x] / (sum(ratio.values())) <= counts[x] / (sum(counts.values()) or 1)
+                    key=lambda x: ratio[x] / (sum(ratio.values())
+                                              ) <= counts[x] / (sum(counts.values()) or 1)
                 )
             else:
                 utype = min(
                     ratio,
-                    key=lambda x: ratio[x] / (sum(ratio.values())) <= counts[x] / (sum(counts.values()) or 1)
+                    key=lambda x: ratio[x] / (sum(ratio.values())
+                                              ) <= counts[x] / (sum(counts.values()) or 1)
                 )
 
             if (len(self.myunits) >= 2 * len(self.enemyunits)) and (sum(counts.values()) >= 100):

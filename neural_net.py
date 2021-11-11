@@ -1,5 +1,6 @@
 import json
 import random
+import torch
 import sys
 import traceback
 from collections import Counter, defaultdict
@@ -22,6 +23,7 @@ class AIBot(Bot):
         self.attack_assignments = {}
         self.spawnerB1 = Brain(8, 4, 2)
         self.spawnerB2 = Brain(8, 4, 2)
+        #self.attackerMB = Brain(i, h, 10000)
         self.prevwood = 0
         self.prevmetal = 0
 
@@ -124,10 +126,14 @@ class AIBot(Bot):
             self.create_unit('gatherer')
         # makes sure it can buy units before doing the hard thinking
         elif self.balance['wood'] >= 10 and self.balance['metal'] >= 10:
-            points += 1
             # counting upo the types of units
             counts = Counter(u.type for u in self.myunits)
+            points += counts['gatherer'] + counts['attacker']
             stop = False
+            dataor = [counts['gatherer'], counts['attacker'], self.balance['wood'], self.balance['metal'],
+                      self.player_balances[str(int(not self.player_id))]['wood'], self.player_balances[str(
+                          int(not self.player_id))]['metal'],
+                      self.balance['wood'] - self.prevwood, self.balance['metal'] - self.prevmetal]
             # this is the buying loop to decide if the net wants to buy another unit
             while not stop and self.balance['wood'] >= 10 and self.balance['metal'] >= 10:
                 # big data array to feed into the brain ~~ length: 8
@@ -135,17 +141,18 @@ class AIBot(Bot):
                         self.player_balances[str(int(not self.player_id))]['wood'], self.player_balances[str(
                             int(not self.player_id))]['metal'],
                         self.balance['wood'] - self.prevwood, self.balance['metal'] - self.prevmetal]
-                print("Penis" + str(data), file=sys.stderr)
+                print("Penis" + ": " + str(self.turn) +
+                      str(data), file=sys.stderr)
                 # first decision: buy unit? 1-yes 0-no
-                c1 = self.spawnerB1.generateOutput(data)
-
+                c1 = self.spawnerB1.select_action(data)
+                c2 = 0
                 if c1 == 0:
                     stop = True  # if no, stop buying
                     break
                 else:
                     # second decision: which unit? 1-attacker 0-gatherer
                     points += 1
-                    c2 = self.spawnerB2.generateOutput(data)
+                    c2 = self.spawnerB2.select_action(data)
                     if c2 == 0:
                         # code i stole from henry, i think it checks if the unit can be bought or not
                         if all(self.balance[x] >= y for x, y in self.costs['gatherer'].items()):
@@ -159,7 +166,21 @@ class AIBot(Bot):
                             points += 3
                             self.create_unit('attacker')
                             counts['attacker'] += 1
-
+                datan = [counts['gatherer'], counts['attacker'], self.balance['wood'], self.balance['metal'],
+                         self.player_balances[str(int(not self.player_id))]['wood'], self.player_balances[str(
+                             int(not self.player_id))]['metal'],
+                         self.balance['wood'] - self.prevwood, self.balance['metal'] - self.prevmetal]
+                self.spawnerB1.memory.push(torch.tensor(np.array(
+                    dataor, dtype=np.float32)), c1, torch.tensor(np.array(datan, dtype=np.float32)), points)
+                self.spawnerB2.memory.push(torch.tensor(np.array(
+                    dataor, dtype=np.float32)), c2, torch.tensor(np.array(datan, dtype=np.float32)), points)
+            self.spawnerB1.optimize_model()
+            self.spawnerB2.optimize_model()
+            if self.turn % self.spawnerB1.TARGET_UPDATE == 0:
+                self.spawnerB1.target_net.load_state_dict(
+                    self.spawnerB1.policy_net.state_dict())
+                self.spawnerB2.target_net.load_state_dict(
+                    self.spawnerB2.policy_net.state_dict())
             # temp mutate for now
             # self.spawnerB1.mutate(1/(points**3))
             # self.spawnerB2.mutate(1/(points**3))
