@@ -7,3 +7,7 @@ game = AIGame(
 )
 game.run()
 print("ITS OVER")
+game = AIGame(
+    ["example_bot2.py", "neural_net.py"],
+)
+game.run()

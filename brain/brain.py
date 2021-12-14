@@ -66,7 +66,7 @@ class NN(nn.Module):
 
 class Brain:
     def __init__(self, i, h, o):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cpu"
         self.policy_net = NN(i, h, o).to(self.device)
         self.target_net = NN(i, h, o).to(self.device)
         self.n_actions = o
