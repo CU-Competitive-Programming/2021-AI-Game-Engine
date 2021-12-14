@@ -32,7 +32,7 @@ class AIGame(object):
     running = False
     turn = None
 
-    def __init__(self, paths):
+    def __init__(self, paths, port=6667):
         self._units = {}
         self._groups = {}
         self.output = dict(init=None, turns=[])
@@ -41,11 +41,11 @@ class AIGame(object):
         self.num_players = len(paths)
 
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server.bind(('localhost', 6667))
+        self.server.bind(('localhost', port))
         self.server.listen(self.num_players)
 
         corners = [(0, 0), ()]
-        self.players = [Player(self, i, self.np_random, paths[i]) for i in range(self.num_players)]
+        self.players = [Player(self, i, self.np_random, paths[i], port) for i in range(self.num_players)]
         self.round = GameRound(self, self.players, self.np_random)
 
     def run(self):
