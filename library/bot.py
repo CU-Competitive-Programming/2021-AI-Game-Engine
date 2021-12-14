@@ -30,7 +30,7 @@ class Bot:
         self.output = []
         self.player_balances = {}
         self.sock = socket.socket()
-        self.sock.connect(('localhost', 6667))
+        self.sock.connect(('localhost', self.sock.connect(('localhost', int(sys.argv[1])))))
         self._buffer = b""
 
         self.logging_events = logging_events
