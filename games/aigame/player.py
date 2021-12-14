@@ -31,7 +31,7 @@ class Player(object):
 
     ACTION_TIMEOUT = 15  # seconds
 
-    def __init__(self, game, player_id, np_random, file_path):
+    def __init__(self, game, player_id, np_random, file_path, port):
         ''' Initilize a player.
         Args:
             player_id (int): The id of the player
@@ -56,7 +56,7 @@ class Player(object):
             raise RuntimeError(f"Invalid file type: {file_path}")
 
         self.proc = subprocess.Popen(
-            command + [file_path, '6667'],
+            command + [file_path, str(port)],
             # stdout=subprocess.PIPE,
             # stdin=subprocess.PIPE,
             # stderr=subprocess.PIPE,
